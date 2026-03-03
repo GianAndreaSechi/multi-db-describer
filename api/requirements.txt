@@ -1,0 +1,5 @@
+# Dependencies for the API component
+# Example:
+# fastapi
+# uvicorn
+# core @ file://../core # For local development, assuming core is a local path
