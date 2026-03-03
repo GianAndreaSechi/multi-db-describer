@@ -6,9 +6,9 @@ from core.db_connector.models import Instance, Schema, Table, Column
 # For a real test, you would need a running MySQL instance.
 # Consider using Docker for a temporary test database.
 MYSQL_TEST_CONFIG = {
-    "host": "host.docker.internal",
-    "user": "root",
-    "password": "",
+    "host": "localhost",
+    "user": "test_user",
+    "password": "test_password",
     "port": 3306,
     # "database": "test_db" # Optional, for specific database operations
 }
