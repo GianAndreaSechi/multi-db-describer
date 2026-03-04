@@ -7,9 +7,9 @@ from loguru import logger # New import
 # For a real test, you would need a running MySQL instance.
 # Consider using Docker for a temporary test database.
 MYSQL_TEST_CONFIG = {
-    "host": "host.docker.internal",
-    "user": "root",
-    "password": "",
+    "host": "<your_mysql_host>",  # e.g., "localhost" or "mysql_test_container"
+    "user": "<your_mysql_user>",  # e.g., "root"
+    "password": "<your_mysql_password>",  # e.g., "password"
     "port": 3306,
     # "database": "test_db" # Optional, for specific database operations
 }
