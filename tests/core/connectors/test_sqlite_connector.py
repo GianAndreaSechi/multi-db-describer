@@ -3,11 +3,13 @@ import sqlite3
 import os
 from core.db_connector.connectors.sqlite import SQLiteConnector
 from core.db_connector.models import Instance, Schema, Table, Column
+from loguru import logger # New import
 
 @pytest.fixture
 def sqlite_db_path(tmp_path):
     """Fixture to create a temporary SQLite database file."""
     db_file = tmp_path / "test_database.db"
+    logger.info(f"Creating temporary SQLite database at: {db_file}")
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
 
@@ -37,6 +39,7 @@ def sqlite_db_path(tmp_path):
 @pytest.fixture
 def sqlite_connector(sqlite_db_path):
     """Fixture to provide an initialized SQLiteConnector."""
+    logger.info(f"Initializing SQLiteConnector for database: {sqlite_db_path}")
     return SQLiteConnector(connection_params={"database": sqlite_db_path})
 
 def test_sqlite_get_type():

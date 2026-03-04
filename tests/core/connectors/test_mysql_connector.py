@@ -1,14 +1,15 @@
 import pytest
 from core.db_connector.connectors.mysql import MySQLConnector
-from core.db_connector.models import Instance, Schema, Table, Column
+from core.db_connector.models import Instance, Schema, Table, Column, TableDescription, PrimaryKey, ForeignKey, Index # Updated import
+from loguru import logger # New import
 
 # --- Configuration for MySQL Test (ADJUST THESE VALUES) ---
 # For a real test, you would need a running MySQL instance.
 # Consider using Docker for a temporary test database.
 MYSQL_TEST_CONFIG = {
-    "host": "localhost",
-    "user": "test_user",
-    "password": "test_password",
+    "host": "host.docker.internal",
+    "user": "root",
+    "password": "",
     "port": 3306,
     # "database": "test_db" # Optional, for specific database operations
 }
@@ -21,7 +22,8 @@ try:
     temp_conn = MySQLConnector(connection_params=MYSQL_TEST_CONFIG)
     MYSQL_IS_AVAILABLE = True
 except (ValueError, ConnectionError) as e:
-    print(f"MySQL test skipped: {e}")
+    logger.error(f"MySQL test skipped: {e}")
+    logger.exception("MySQL connection test failed:")
     MYSQL_IS_AVAILABLE = False
 
 mysql_skip_reason = "MySQL test configuration is invalid or connection failed."
@@ -71,24 +73,39 @@ def test_mysql_list_tables(mysql_connector):
     assert all(t.schema_name == "test_db" for t in tables)
 
 def test_mysql_describe_table(mysql_connector):
-    columns = mysql_connector.describe_table(
+    # Note: describe_table now returns TableDescription, not List[Column]
+    table_desc: TableDescription = mysql_connector.describe_table(
         instance_name=MYSQL_TEST_CONFIG["host"], schema_name="test_db", table_name="test_table"
     )
-    assert len(columns) == 3 # id, name, value
     
-    col_names = {c.name for c in columns}
+    # Assertions for columns
+    assert len(table_desc.columns) == 3 # id, name, value
+    col_names = {c.name for c in table_desc.columns}
     assert "id" in col_names
     assert "name" in col_names
     assert "value" in col_names
 
-    id_col = next(c for c in columns if c.name == "id")
-    assert id_col.data_type == "int" # MySQL type might be 'int(11)' or similar, adjust if needed
+    id_col = next(c for c in table_desc.columns if c.name == "id")
+    assert id_col.data_type == "int(11)"
     assert not id_col.is_nullable
 
-    name_col = next(c for c in columns if c.name == "name")
-    assert name_col.data_type == "varchar(255)" # Adjust type if needed
+    name_col = next(c for c in table_desc.columns if c.name == "name")
+    assert name_col.data_type == "varchar(255)"
     assert not name_col.is_nullable
 
-    value_col = next(c for c in columns if c.name == "value")
-    assert value_col.data_type == "int" # Adjust type if needed
+    value_col = next(c for c in table_desc.columns if c.name == "value")
+    assert value_col.data_type == "int(11)"
     assert value_col.is_nullable # Assuming default INT is nullable
+
+    # Assertions for PK, FK, Indexes (basic checks)
+    assert table_desc.primary_key is not None
+    assert "id" in table_desc.primary_key.column_names
+    
+    # Assuming no FKs or other indexes for this basic test table
+    assert len(table_desc.foreign_keys) == 0
+    # Check for primary key index
+    pk_index = next((idx for idx in table_desc.indexes if idx.is_primary), None)
+    assert pk_index is not None
+    assert pk_index.name == "PRIMARY"
+    assert "id" in pk_index.column_names
+    assert pk_index.is_unique
