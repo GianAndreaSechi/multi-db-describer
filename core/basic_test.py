@@ -4,10 +4,11 @@ from loguru import logger # New import
 
 # Configuration for MySQL Test (ADJUST THESE VALUES)
 MYSQL_CONFIG = {
-    "host": "host.docker.internal",
-    "user": "root",
-    "password": "",
+    "host": "<your_mysql_host>",  # e.g., "localhost" or "mysql_test_container"
+    "user": "<your_mysql_user>",  # e.g., "root"
+    "password": "<your_mysql_password>",  # e.g., "password"
     "port": 3306,
+    # "database": "test_db" # Optional, for specific database operations
 }
 
 def run_basic_mysql_test():
