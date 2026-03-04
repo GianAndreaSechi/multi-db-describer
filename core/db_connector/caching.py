@@ -47,9 +47,9 @@ def cache_result(ttl: int = 3600):
             if result is not None:
                 # This assumes the result is a list of Pydantic models or a single model
                 if isinstance(result, list):
-                    serializable_result = [item.dict() for item in result]
+                    serializable_result = [item.model_dump() for item in result]
                 else:
-                    serializable_result = result.dict()
+                    serializable_result = result.model_dump()
                 
                 try:
                     REDIS_CLIENT.setex(cache_key, ttl, json.dumps(serializable_result))

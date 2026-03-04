@@ -2,3 +2,5 @@ pydantic
 redis
 mysql-connector-python
 pytest
+duckdb
+loguru

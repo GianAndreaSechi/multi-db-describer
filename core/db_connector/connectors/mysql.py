@@ -1,8 +1,9 @@
 import mysql.connector
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from core.db_connector.interface import BaseConnector
-from core.db_connector.models import Instance, Schema, Table, Column
+from core.db_connector.models import Instance, Schema, Table, Column, PrimaryKey, ForeignKey, Index, TableDescription
 from core.db_connector.caching import cache_result
+from loguru import logger
 
 class MySQLConnector(BaseConnector):
     """
@@ -20,7 +21,8 @@ class MySQLConnector(BaseConnector):
         self.password = connection_params.get("password")
         self.port = connection_params.get("port", 3306)
         
-        if not all([self.host, self.user, self.password]):
+        if not (self.host and self.user and self.password is not None):
+            logger.error("MySQL connector requires 'host', 'user', and 'password' in connection_params.")
             raise ValueError("MySQL connector requires 'host', 'user', and 'password' in connection_params.")
         
         # Test connection
@@ -32,7 +34,9 @@ class MySQLConnector(BaseConnector):
                 port=self.port
             )
             conn.close()
+            logger.info(f"Successfully connected to MySQL at {self.host}:{self.port}")
         except mysql.connector.Error as e:
+            logger.exception(f"Failed to connect to MySQL database at {self.host}:{self.port}")
             raise ConnectionError(f"Failed to connect to MySQL database at {self.host}:{self.port}: {e}")
 
     def _get_connection(self, database: Optional[str] = None):
@@ -55,6 +59,7 @@ class MySQLConnector(BaseConnector):
             cursor.execute(query, params)
             return cursor.fetchall()
         except mysql.connector.Error as e:
+            logger.exception(f"MySQL query failed: {e} - Query: {query}")
             raise RuntimeError(f"MySQL query failed: {e} - Query: {query}")
         finally:
             if cursor:
@@ -73,6 +78,7 @@ class MySQLConnector(BaseConnector):
     @cache_result(ttl=3600)
     def list_schemas(self, instance_name: str) -> List[Schema]:
         if instance_name != self.host:
+            logger.error(f"Instance name '{instance_name}' does not match connected host '{self.host}'")
             raise ValueError(f"Instance name '{instance_name}' does not match connected host '{self.host}'")
         
         query = "SHOW DATABASES;"
@@ -82,6 +88,7 @@ class MySQLConnector(BaseConnector):
     @cache_result(ttl=3600)
     def list_tables(self, instance_name: str, schema_name: str) -> List[Table]:
         if instance_name != self.host:
+            logger.error(f"Instance name '{instance_name}' does not match connected host '{self.host}'")
             raise ValueError(f"Instance name '{instance_name}' does not match connected host '{self.host}'")
         
         query = f"SHOW TABLES FROM `{schema_name}`;"
@@ -91,15 +98,17 @@ class MySQLConnector(BaseConnector):
         return [Table(name=row[table_key], schema_name=schema_name) for row in rows]
 
     @cache_result(ttl=3600)
-    def describe_table(self, instance_name: str, schema_name: str, table_name: str) -> List[Column]:
+    def describe_table(self, instance_name: str, schema_name: str, table_name: str) -> TableDescription:
         if instance_name != self.host:
+            logger.error(f"Instance name '{instance_name}' does not match connected host '{self.host}'")
             raise ValueError(f"Instance name '{instance_name}' does not match connected host '{self.host}'")
         
-        query = f"SHOW COLUMNS FROM `{schema_name}`.`{table_name}`;"
-        rows = self._execute_query(query, database=schema_name)
+        # Fetch columns
+        query_columns = f"SHOW COLUMNS FROM `{schema_name}`.`{table_name}`;"
+        column_rows = self._execute_query(query_columns, database=schema_name)
         
         columns = []
-        for row in rows:
+        for row in column_rows:
             columns.append(
                 Column(
                     name=row["Field"],
@@ -109,4 +118,87 @@ class MySQLConnector(BaseConnector):
                     comment=None # MySQL SHOW COLUMNS does not provide column comments directly
                 )
             )
-        return columns
+        
+        # Fetch PK, FK, Indexes
+        primary_key = self._get_primary_key_details(schema_name, table_name)
+        foreign_keys = self._get_foreign_key_details(schema_name, table_name)
+        indexes = self._get_index_details(schema_name, table_name)
+
+        return TableDescription(
+            instance_name=instance_name,
+            schema_name=schema_name,
+            table_name=table_name,
+            columns=columns,
+            primary_key=primary_key,
+            foreign_keys=foreign_keys,
+            indexes=indexes
+        )
+
+    def _get_primary_key_details(self, schema_name: str, table_name: str) -> Optional[PrimaryKey]:
+        query = f"""
+            SELECT COLUMN_NAME
+            FROM information_schema.KEY_COLUMN_USAGE
+            WHERE TABLE_SCHEMA = '{schema_name}'
+              AND TABLE_NAME = '{table_name}'
+              AND CONSTRAINT_NAME = 'PRIMARY'
+            ORDER BY ORDINAL_POSITION;
+        """
+        rows = self._execute_query(query, database='information_schema')
+        if rows:
+            return PrimaryKey(column_names=[row['COLUMN_NAME'] for row in rows])
+        return None
+
+    def _get_foreign_key_details(self, schema_name: str, table_name: str) -> List[ForeignKey]:
+        query = f"""
+            SELECT
+                kcu.COLUMN_NAME,
+                kcu.REFERENCED_TABLE_NAME,
+                kcu.REFERENCED_COLUMN_NAME,
+                kcu.CONSTRAINT_NAME
+            FROM information_schema.KEY_COLUMN_USAGE AS kcu
+            WHERE kcu.TABLE_SCHEMA = '{schema_name}'
+              AND kcu.TABLE_NAME = '{table_name}'
+              AND kcu.REFERENCED_TABLE_NAME IS NOT NULL;
+        """
+        rows = self._execute_query(query, database='information_schema')
+        foreign_keys = []
+        for row in rows:
+            foreign_keys.append(
+                ForeignKey(
+                    column_name=row['COLUMN_NAME'],
+                    referenced_table=row['REFERENCED_TABLE_NAME'],
+                    referenced_column=row['REFERENCED_COLUMN_NAME'],
+                    constraint_name=row['CONSTRAINT_NAME']
+                )
+            )
+        return foreign_keys
+
+    def _get_index_details(self, schema_name: str, table_name: str) -> List[Index]:
+        query = f"""
+            SELECT
+                INDEX_NAME,
+                COLUMN_NAME,
+                NON_UNIQUE,
+                SEQ_IN_INDEX
+            FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = '{schema_name}'
+              AND TABLE_NAME = '{table_name}'
+            ORDER BY INDEX_NAME, SEQ_IN_INDEX;
+        """
+        rows = self._execute_query(query, database='information_schema')
+        
+        indexes_map = {}
+        for row in rows:
+            index_name = row['INDEX_NAME']
+            if index_name not in indexes_map:
+                indexes_map[index_name] = {
+                    'name': index_name,
+                    'column_names': [],
+                    'is_unique': not bool(row['NON_UNIQUE']),
+                    'is_primary': (index_name == 'PRIMARY'),
+                    'type': None # information_schema.STATISTICS doesn't directly give index type (BTREE/HASH)
+                }
+            indexes_map[index_name]['column_names'].append(row['COLUMN_NAME'])
+        
+        return [Index(**idx) for idx in indexes_map.values()]
+
