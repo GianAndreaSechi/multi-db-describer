@@ -10,8 +10,6 @@ ENV PYTHONPATH=/app
 # Copy only the core component and its specific tests
 COPY core /app/core
 COPY tests/core /app/tests/core
-COPY core/check_mysql_connection.py /app/core/check_mysql_connection.py
-COPY core/basic_test.py /app/core/basic_test.py
 
 # Copy the requirements file for the core component
 COPY core/requirements.txt /app/core/requirements.txt
