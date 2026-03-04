@@ -2,6 +2,7 @@ import importlib
 import pkgutil
 from typing import Dict, Type, Optional
 from .interface import BaseConnector
+from loguru import logger # New import
 
 class ConnectorManager:
     """
@@ -28,7 +29,7 @@ class ConnectorManager:
                     # Register the connector class by its type name
                     connector_type = attr.get_type()
                     if connector_type in self.connectors:
-                        print(f"Warning: Duplicate connector type '{connector_type}' found. Overwriting.")
+                        logger.warning(f"Duplicate connector type '{connector_type}' found. Overwriting.")
                     self.connectors[connector_type] = attr
 
     def get_available_connectors(self) -> list[str]:
@@ -48,6 +49,7 @@ class ConnectorManager:
         """
         connector_class = self.connectors.get(connector_type)
         if not connector_class:
+            logger.error(f"Connector type '{connector_type}' not found.")
             raise ValueError(f"Connector type '{connector_type}' not found.")
         
         return connector_class(connection_params=connection_params)
