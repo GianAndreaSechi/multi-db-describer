@@ -28,7 +28,6 @@ app = FastAPI(
     version="0.1.0",
 )
 
-
 # Initialize ConnectorManager and Services
 connector_manager = ConnectorManager()
 config_service = ConfigService(connector_manager)
