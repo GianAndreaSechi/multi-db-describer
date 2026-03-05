@@ -37,9 +37,7 @@ schema_service = SchemaService(config_service, connector_manager, instance_servi
 table_service = TableService(config_service, connector_manager, instance_service, schema_service)
 describe_table_service = DescribeTableService(config_service, connector_manager, instance_service, schema_service, table_service)
 
-
-
-
+#start routing
 @app.get("/")
 async def read_root():
     logger.info("Root endpoint accessed.")
