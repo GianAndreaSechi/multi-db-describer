@@ -1,0 +1,28 @@
+from typing import Dict, Any, List, Optional
+from loguru import logger
+
+from core.db_connector.manager import ConnectorManager
+from core.db_connector.models import Instance
+from api.src.services.config_service import ConfigService # New import
+
+class InstanceService:
+    def __init__(self, config_service: ConfigService, connector_manager: ConnectorManager):
+        self.config_service = config_service
+        self.connector_manager = connector_manager
+
+    def list_instances(self, config_names: Optional[List[str]] = None) -> List[Instance]:
+        all_instances = []
+        if not config_names:
+            config_names = self.config_service.get_available_configurations()
+
+        for c_name in config_names:
+            logger.info(f"InstanceService: Listing instances for config: {c_name}")
+            try:
+                details = self.config_service._get_connector_details(c_name)
+                connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
+                instances = connector.list_instances()
+                all_instances.extend(instances)
+                logger.info(f"InstanceService: Found {len(instances)} instances for config: {c_name}")
+            except Exception as e:
+                logger.warning(f"InstanceService: Could not list instances for configuration {c_name}: {e}")
+        return all_instances

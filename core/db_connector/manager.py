@@ -2,7 +2,7 @@ import importlib
 import pkgutil
 from typing import Dict, Type, Optional
 from .interface import BaseConnector
-from loguru import logger # New import
+from loguru import logger
 
 class ConnectorManager:
     """
@@ -53,4 +53,5 @@ class ConnectorManager:
             raise ValueError(f"Connector type '{connector_type}' not found.")
         
         return connector_class(connection_params=connection_params)
+
 
