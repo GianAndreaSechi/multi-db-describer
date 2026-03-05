@@ -3,14 +3,24 @@ from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 from loguru import logger
 import os
-import json # New import
+# Removed json import
 
 from core.db_connector.manager import ConnectorManager
 from core.db_connector.models import (
     Instance, Schema, Table,
     TableDescription # Only need TableDescription for response_model
 )
-from api.src.services.db_service import DBService # New import
+from api.src.services.config_service import ConfigService # Updated import
+from api.src.services.instance_service import InstanceService # New import
+from api.src.services.schema_service import SchemaService # New import
+from api.src.services.table_service import TableService # New import
+from api.src.services.describe_table_service import DescribeTableService # New import
+
+from api.src.models.requests.connection_request import ConnectionRequest
+from api.src.models.requests.instance_request import InstanceRequest
+from api.src.models.requests.schema_request import SchemaRequest
+from api.src.models.requests.table_request import TableRequest
+from api.src.models.requests.describe_table_request import DescribeTableRequest
 
 app = FastAPI(
     title="Multi-DB Connector API",
@@ -18,39 +28,16 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Define the path to the configuration file
-CONFIG_FILE_PATH = os.path.join(os.path.dirname(__file__), "configurations", "db_configurations.json")
 
-# Load database configurations
-with open(CONFIG_FILE_PATH, 'r') as f:
-    DB_CONFIGURATIONS = json.load(f)
-logger.info(f"Loaded {len(DB_CONFIGURATIONS)} database configurations from {CONFIG_FILE_PATH}")
-
-# Initialize ConnectorManager and DBService once
+# Initialize ConnectorManager and Services
 connector_manager = ConnectorManager()
-db_service = DBService(connector_manager, DB_CONFIGURATIONS) # Pass configurations to DBService
+config_service = ConfigService(connector_manager)
+instance_service = InstanceService(config_service, connector_manager)
+schema_service = SchemaService(config_service, connector_manager, instance_service)
+table_service = TableService(config_service, connector_manager, instance_service, schema_service)
+describe_table_service = DescribeTableService(config_service, connector_manager, instance_service, schema_service, table_service)
 
-# Pydantic models for request bodies
-class ConnectionRequest(BaseModel):
-    config_name: str
 
-class InstanceRequest(BaseModel):
-    config_names: Optional[List[str]] = None
-
-class SchemaRequest(BaseModel):
-    config_name: Optional[str] = None
-    instance_name: Optional[str] = None
-
-class TableRequest(BaseModel):
-    config_name: Optional[str] = None
-    instance_name: Optional[str] = None
-    schema_name: Optional[str] = None
-
-class DescribeTableRequest(BaseModel):
-    config_name: Optional[str] = None
-    instance_name: Optional[str] = None
-    schema_name: Optional[str] = None
-    table_name: Optional[str] = None
 
 
 @app.get("/")
@@ -69,7 +56,7 @@ async def get_available_configurations():
     Get a list of all available database configurations.
     """
     logger.info("API: Fetching available configurations.")
-    return db_service.get_available_configurations()
+    return config_service.get_available_configurations()
 
 @app.post("/connect")
 async def test_connection(request: ConnectionRequest):
@@ -78,7 +65,7 @@ async def test_connection(request: ConnectionRequest):
     """
     logger.info(f"API: Attempting to test connection for config: {request.config_name}")
     try:
-        return db_service.test_connection(request.config_name)
+        return config_service.test_connection(request.config_name)
     except ValueError as e:
         logger.error(f"API: Connection test failed: {e}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -98,7 +85,7 @@ async def list_instances_route(request: InstanceRequest):
     """
     logger.info(f"API: Listing instances for config names: {request.config_names if request.config_names else 'all available'}")
     try:
-        return db_service.list_instances(request.config_names)
+        return instance_service.list_instances(request.config_names)
     except ValueError as e:
         logger.error(f"API: Listing instances failed: {e}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -118,7 +105,7 @@ async def list_schemas_route(request: SchemaRequest):
     """
     logger.info(f"API: Listing schemas for config: {request.config_name if request.config_name else 'all'}, instance: {request.instance_name if request.instance_name else 'all'}")
     try:
-        return db_service.list_schemas(request.config_name, request.instance_name)
+        return schema_service.list_schemas(request.config_name, request.instance_name)
     except ValueError as e:
         logger.error(f"API: Listing schemas failed: {e}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -139,7 +126,7 @@ async def list_tables_route(request: TableRequest):
     """
     logger.info(f"API: Listing tables for config: {request.config_name if request.config_name else 'all'}, instance: {request.instance_name if request.instance_name else 'all'}, schema: {request.schema_name if request.schema_name else 'all'}")
     try:
-        return db_service.list_tables(request.config_name, request.instance_name, request.schema_name)
+        return table_service.list_tables(request.config_name, request.instance_name, request.schema_name)
     except ValueError as e:
         logger.error(f"API: Listing tables failed: {e}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -162,7 +149,7 @@ async def describe_table_route(request: DescribeTableRequest):
     """
     logger.info(f"API: Describing table for config: {request.config_name if request.config_name else 'all'}, instance: {request.instance_name if request.instance_name else 'all'}, schema: {request.schema_name if request.schema_name else 'all'}, table: {request.table_name if request.table_name else 'all'}")
     try:
-        return db_service.describe_table(
+        return describe_table_service.describe_table(
             request.config_name,
             request.instance_name,
             request.schema_name,
