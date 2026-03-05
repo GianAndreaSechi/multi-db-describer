@@ -4,17 +4,11 @@ from loguru import logger
 from core.db_connector.manager import ConnectorManager
 from core.db_connector.models import Instance, Schema, Table, TableDescription
 from api.src.services.config_service import ConfigService
-from api.src.services.instance_service import InstanceService
-from api.src.services.schema_service import SchemaService
-from api.src.services.table_service import TableService # New import
 
 class DescribeTableService:
-    def __init__(self, config_service: ConfigService, connector_manager: ConnectorManager, instance_service: InstanceService, schema_service: SchemaService, table_service: TableService):
+    def __init__(self, config_service: ConfigService, connector_manager: ConnectorManager): # Removed instance_service, schema_service, table_service
         self.config_service = config_service
         self.connector_manager = connector_manager
-        self.instance_service = instance_service
-        self.schema_service = schema_service
-        self.table_service = table_service
 
     def describe_table(self, config_name: Optional[str] = None, instance_name: Optional[str] = None, schema_name: Optional[str] = None, table_name: Optional[str] = None) -> List[TableDescription]:
         all_table_descriptions = []
@@ -23,11 +17,14 @@ class DescribeTableService:
         for c_name in config_names_to_process:
             try:
                 details = self.config_service._get_connector_details(c_name) # Get details once per config
+                
                 instances_to_process = []
                 if instance_name:
                     instances_to_process.append(Instance(name=instance_name, version=""))
                 else:
-                    instances_for_config = self.instance_service.list_instances(config_names=[c_name])
+                    # Directly get instances using ConfigService and ConnectorManager
+                    connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
+                    instances_for_config = connector.list_instances()
                     instances_to_process.extend(instances_for_config)
 
                 for inst in instances_to_process:
@@ -35,7 +32,9 @@ class DescribeTableService:
                     if schema_name:
                         schemas_to_process.append(Schema(name=schema_name))
                     else:
-                        schemas_for_instance = self.schema_service.list_schemas(config_name=c_name, instance_name=inst.name)
+                        # Directly get schemas using ConfigService and ConnectorManager
+                        connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
+                        schemas_for_instance = connector.list_schemas(instance_name=inst.name)
                         schemas_to_process.extend(schemas_for_instance)
 
                     for sch in schemas_to_process:
@@ -43,7 +42,9 @@ class DescribeTableService:
                         if table_name:
                             tables_to_process.append(Table(name=table_name))
                         else:
-                            tables_for_schema = self.table_service.list_tables(config_name=c_name, instance_name=inst.name, schema_name=sch.name)
+                            # Directly get tables using ConfigService and ConnectorManager
+                            connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
+                            tables_for_schema = connector.list_tables(instance_name=inst.name, schema_name=sch.name)
                             tables_to_process.extend(tables_for_schema)
 
                         for tbl in tables_to_process:

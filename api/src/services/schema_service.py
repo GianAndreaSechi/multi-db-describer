@@ -4,13 +4,11 @@ from loguru import logger
 from core.db_connector.manager import ConnectorManager
 from core.db_connector.models import Instance, Schema
 from api.src.services.config_service import ConfigService
-from api.src.services.instance_service import InstanceService # New import
 
 class SchemaService:
-    def __init__(self, config_service: ConfigService, connector_manager: ConnectorManager, instance_service: InstanceService):
+    def __init__(self, config_service: ConfigService, connector_manager: ConnectorManager): # Removed instance_service
         self.config_service = config_service
         self.connector_manager = connector_manager
-        self.instance_service = instance_service
 
     def list_schemas(self, config_name: Optional[str] = None, instance_name: Optional[str] = None) -> List[Schema]:
         all_schemas = []
@@ -19,13 +17,14 @@ class SchemaService:
         for c_name in config_names_to_process:
             try:
                 details = self.config_service._get_connector_details(c_name) # Get details once per config
+                
                 instances_to_process = []
                 if instance_name:
-                    # If a specific instance_name is provided, create a dummy Instance object
                     instances_to_process.append(Instance(name=instance_name, version=""))
                 else:
-                    # If no instance_name, get all instances for the current config
-                    instances_for_config = self.instance_service.list_instances(config_names=[c_name])
+                    # Directly get instances using ConfigService and ConnectorManager
+                    connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
+                    instances_for_config = connector.list_instances()
                     instances_to_process.extend(instances_for_config)
 
                 for inst in instances_to_process:

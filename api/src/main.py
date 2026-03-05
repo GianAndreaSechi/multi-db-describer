@@ -33,9 +33,9 @@ app = FastAPI(
 connector_manager = ConnectorManager()
 config_service = ConfigService(connector_manager)
 instance_service = InstanceService(config_service, connector_manager)
-schema_service = SchemaService(config_service, connector_manager, instance_service)
-table_service = TableService(config_service, connector_manager, instance_service, schema_service)
-describe_table_service = DescribeTableService(config_service, connector_manager, instance_service, schema_service, table_service)
+schema_service = SchemaService(config_service, connector_manager)
+table_service = TableService(config_service, connector_manager)
+describe_table_service = DescribeTableService(config_service, connector_manager)
 
 #start routing
 @app.get("/")
