@@ -4,9 +4,9 @@
 
 This one allow you to create a docker image to test and execute /core project
 
-docker build -t multi-db-connector-core -f core/Dockerfile .
+docker build -t multi-db-core -f core/Dockerfile .
 
-docker run -d multi-db-connector
+docker run -d multi-db-core
 
 docker ps
 
