@@ -23,6 +23,13 @@ The `core` component itself is a library and does not typically run as a standal
 
 If you are developing or testing the `core` component in isolation, you might use a Docker container to set up a consistent Python environment. For example, to run tests within a Docker container:
 
+0. **Using docker-compose:**
+    ```bash
+    docker-compose build
+    
+    docker-compose up
+    ```
+
 1.  **Build the Docker image for the core environment (if a Dockerfile exists for core):**
     ```bash
     docker build -t multi-db-core-env -f core/Dockerfile .
