@@ -3,13 +3,15 @@ import pkgutil
 from typing import Dict, Type, Optional
 from .interface import BaseConnector
 from loguru import logger
+from .cache_manager import CacheManager # Import CacheManager
 
 class ConnectorManager:
     """
     Discovers and manages available database connectors.
     """
-    def __init__(self):
+    def __init__(self, cache_manager: CacheManager): # Add cache_manager parameter
         self.connectors: Dict[str, Type[BaseConnector]] = {}
+        self.cache_manager = cache_manager # Store cache_manager
         self._discover_connectors()
 
     def _discover_connectors(self):
@@ -52,6 +54,7 @@ class ConnectorManager:
             logger.error(f"Connector type '{connector_type}' not found.")
             raise ValueError(f"Connector type '{connector_type}' not found.")
         
-        return connector_class(connection_params=connection_params)
+        # Pass cache_manager to the connector constructor
+        return connector_class(connection_params=connection_params, cache_manager=self.cache_manager)
 
 
