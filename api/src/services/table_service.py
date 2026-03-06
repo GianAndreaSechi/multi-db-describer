@@ -10,7 +10,7 @@ class TableService:
         self.config_service = config_service
         self.connector_manager = connector_manager
 
-    def list_tables(self, config_name: Optional[str] = None, instance_name: Optional[str] = None, schema_name: Optional[str] = None) -> List[Table]:
+    def list_tables(self, config_name: Optional[str] = None, instance_name: Optional[str] = None, schema_name: Optional[str] = None, limit: Optional[int] = None, offset: Optional[int] = None, no_cache: bool = False) -> List[Table]:
         all_tables = []
         config_names_to_process = [config_name] if config_name else self.config_service.get_available_configurations()
 
@@ -24,7 +24,7 @@ class TableService:
                 else:
                     # Directly get instances using ConfigService and ConnectorManager
                     connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
-                    instances_for_config = connector.list_instances()
+                    instances_for_config = connector.list_instances(no_cache=no_cache)
                     instances_to_process.extend(instances_for_config)
 
                 for inst in instances_to_process:
@@ -34,13 +34,13 @@ class TableService:
                     else:
                         # Directly get schemas using ConfigService and ConnectorManager
                         connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
-                        schemas_for_instance = connector.list_schemas(instance_name=inst.name)
+                        schemas_for_instance = connector.list_schemas(instance_name=inst.name, no_cache=no_cache)
                         schemas_to_process.extend(schemas_for_instance)
 
                     for sch in schemas_to_process:
                         logger.info(f"TableService: Listing tables for config: {c_name}, instance: {inst.name}, schema: {sch.name}")
                         connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
-                        tables = connector.list_tables(instance_name=inst.name, schema_name=sch.name)
+                        tables = connector.list_tables(instance_name=inst.name, schema_name=sch.name, limit=limit, offset=offset, no_cache=no_cache)
                         all_tables.extend(tables)
                         logger.info(f"TableService: Found {len(tables)} tables for schema: {sch.name}")
             except Exception as e:

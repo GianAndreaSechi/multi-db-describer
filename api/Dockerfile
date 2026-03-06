@@ -4,6 +4,9 @@ FROM python:3.9-slim-buster
 # Set the working directory in the container
 WORKDIR /app
 
+# Set PYTHONPATH to include the /app directory
+ENV PYTHONPATH=/app
+
 # Copy only the necessary components
 COPY core /app/core
 COPY api /app/api
@@ -20,3 +23,4 @@ EXPOSE 8000
 
 # Command to run the FastAPI application
 CMD ["uvicorn", "api.src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+

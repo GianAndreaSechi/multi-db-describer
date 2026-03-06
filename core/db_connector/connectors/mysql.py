@@ -2,8 +2,8 @@ import mysql.connector
 from typing import List, Dict, Any, Optional
 from core.db_connector.interface import BaseConnector
 from core.db_connector.models import Instance, Schema, Table, Column, PrimaryKey, ForeignKey, Index, TableDescription
-from core.db_connector.caching import cache_result
 from loguru import logger
+from ..cache_manager import CacheManager # Import CacheManager
 
 class MySQLConnector(BaseConnector):
     """
@@ -14,8 +14,8 @@ class MySQLConnector(BaseConnector):
     def get_type() -> str:
         return "mysql"
 
-    def __init__(self, connection_params: Dict[str, Any]):
-        super().__init__(connection_params)
+    def __init__(self, connection_params: Dict[str, Any], cache_manager: CacheManager):
+        super().__init__(connection_params, cache_manager)
         self.host = connection_params.get("host")
         self.user = connection_params.get("user")
         self.password = connection_params.get("password")
@@ -67,38 +67,67 @@ class MySQLConnector(BaseConnector):
             if conn:
                 conn.close()
 
-    @cache_result(ttl=3600)
-    def list_instances(self) -> List[Instance]:
+    def list_instances(self, no_cache: bool = False) -> List[Instance]:
+        cache_key = f"mysql_instances:{self.host}"
+        cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
+        if cached_data:
+            return [Instance(**d) for d in cached_data]
+
         # For MySQL, the instance is the host. We can get the version.
         query = "SELECT VERSION();"
         result = self._execute_query(query)
         version = result[0]['VERSION()'] if result else None
-        return [Instance(name=self.host, version=version)]
+        instances = [Instance(name=self.host, version=version)]
+        self.cache_manager.set_cached_data(cache_key, [i.model_dump() for i in instances])
+        return instances
 
-    @cache_result(ttl=3600)
-    def list_schemas(self, instance_name: str) -> List[Schema]:
+    def list_schemas(self, instance_name: str, no_cache: bool = False) -> List[Schema]:
+        cache_key = f"mysql_schemas:{self.host}:{instance_name}"
+        cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
+        if cached_data:
+            return [Schema(**d) for d in cached_data]
+
         if instance_name != self.host:
             logger.error(f"Instance name '{instance_name}' does not match connected host '{self.host}'")
             raise ValueError(f"Instance name '{instance_name}' does not match connected host '{self.host}'")
         
         query = "SHOW DATABASES;"
         rows = self._execute_query(query)
-        return [Schema(name=row["Database"]) for row in rows if row["Database"] not in ["information_schema", "mysql", "performance_schema", "sys"]]
+        schemas = [Schema(name=row["Database"]) for row in rows if row["Database"] not in ["information_schema", "mysql", "performance_schema", "sys"]]
+        self.cache_manager.set_cached_data(cache_key, [s.model_dump() for s in schemas])
+        return schemas
 
-    @cache_result(ttl=3600)
-    def list_tables(self, instance_name: str, schema_name: str) -> List[Table]:
+    def list_tables(self, instance_name: str, schema_name: str, limit: Optional[int] = None, offset: Optional[int] = None, no_cache: bool = False) -> List[Table]:
+        cache_key = f"mysql_tables:{self.host}:{instance_name}:{schema_name}:{limit}:{offset}"
+        cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
+        if cached_data:
+            return [Table(**d) for d in cached_data]
+
         if instance_name != self.host:
             logger.error(f"Instance name '{instance_name}' does not match connected host '{self.host}'")
             raise ValueError(f"Instance name '{instance_name}' does not match connected host '{self.host}'")
         
-        query = f"SHOW TABLES FROM `{schema_name}`;"
-        rows = self._execute_query(query, database=schema_name)
-        # The key in the dict will be like 'Tables_in_your_db_name'
-        table_key = f"Tables_in_{schema_name}"
-        return [Table(name=row[table_key], schema_name=schema_name) for row in rows]
+        query = f"SHOW TABLES FROM `{schema_name}`"
+        
+        if limit is not None:
+            query += f" LIMIT {limit}"
+        if offset is not None:
+            query += f" OFFSET {offset}"
 
-    @cache_result(ttl=3600)
-    def describe_table(self, instance_name: str, schema_name: str, table_name: str) -> TableDescription:
+        query += ";"
+
+        rows = self._execute_query(query, database=schema_name)
+        table_key = f"Tables_in_{schema_name}"
+        tables = [Table(name=row[table_key], schema_name=schema_name) for row in rows]
+        self.cache_manager.set_cached_data(cache_key, [t.model_dump() for t in tables])
+        return tables
+
+    def describe_table(self, instance_name: str, schema_name: str, table_name: str, no_cache: bool = False) -> TableDescription:
+        cache_key = f"mysql_describe_table:{self.host}:{instance_name}:{schema_name}:{table_name}"
+        cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
+        if cached_data:
+            return TableDescription(**cached_data)
+
         if instance_name != self.host:
             logger.error(f"Instance name '{instance_name}' does not match connected host '{self.host}'")
             raise ValueError(f"Instance name '{instance_name}' does not match connected host '{self.host}'")
@@ -115,7 +144,7 @@ class MySQLConnector(BaseConnector):
                     data_type=row["Type"],
                     is_nullable=row["Null"] == "YES",
                     default_value=row["Default"],
-                    comment=None # MySQL SHOW COLUMNS does not provide column comments directly
+                    comment=None
                 )
             )
         
@@ -124,7 +153,7 @@ class MySQLConnector(BaseConnector):
         foreign_keys = self._get_foreign_key_details(schema_name, table_name)
         indexes = self._get_index_details(schema_name, table_name)
 
-        return TableDescription(
+        table_description = TableDescription(
             instance_name=instance_name,
             schema_name=schema_name,
             table_name=table_name,
@@ -133,6 +162,8 @@ class MySQLConnector(BaseConnector):
             foreign_keys=foreign_keys,
             indexes=indexes
         )
+        self.cache_manager.set_cached_data(cache_key, table_description.model_dump())
+        return table_description
 
     def _get_primary_key_details(self, schema_name: str, table_name: str) -> Optional[PrimaryKey]:
         query = f"""

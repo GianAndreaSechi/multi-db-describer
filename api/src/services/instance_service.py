@@ -10,7 +10,7 @@ class InstanceService:
         self.config_service = config_service
         self.connector_manager = connector_manager
 
-    def list_instances(self, config_names: Optional[List[str]] = None) -> List[Instance]:
+    def list_instances(self, config_names: Optional[List[str]] = None, no_cache: bool = False) -> List[Instance]:
         all_instances = []
         if not config_names:
             config_names = self.config_service.get_available_configurations()
@@ -20,7 +20,7 @@ class InstanceService:
             try:
                 details = self.config_service._get_connector_details(c_name)
                 connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
-                instances = connector.list_instances()
+                instances = connector.list_instances(no_cache=no_cache)
                 all_instances.extend(instances)
                 logger.info(f"InstanceService: Found {len(instances)} instances for config: {c_name}")
             except Exception as e:
