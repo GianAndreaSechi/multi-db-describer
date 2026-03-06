@@ -1,4 +1,5 @@
-# Dependencies for the MCP component
-# Example:
-# some-mcp-specific-library
-# core @ file://../core # For local development, assuming core is a local path
+fastmcp
+loguru
+python-dotenv
+httpx
+toon-format
