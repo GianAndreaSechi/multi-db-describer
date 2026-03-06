@@ -10,7 +10,7 @@ class TableService:
         self.config_service = config_service
         self.connector_manager = connector_manager
 
-    def list_tables(self, config_name: Optional[str] = None, instance_name: Optional[str] = None, schema_name: Optional[str] = None) -> List[Table]:
+    def list_tables(self, config_name: Optional[str] = None, instance_name: Optional[str] = None, schema_name: Optional[str] = None, limit: Optional[int] = None, offset: Optional[int] = None) -> List[Table]:
         all_tables = []
         config_names_to_process = [config_name] if config_name else self.config_service.get_available_configurations()
 
@@ -40,7 +40,7 @@ class TableService:
                     for sch in schemas_to_process:
                         logger.info(f"TableService: Listing tables for config: {c_name}, instance: {inst.name}, schema: {sch.name}")
                         connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
-                        tables = connector.list_tables(instance_name=inst.name, schema_name=sch.name)
+                        tables = connector.list_tables(instance_name=inst.name, schema_name=sch.name, limit=limit, offset=offset)
                         all_tables.extend(tables)
                         logger.info(f"TableService: Found {len(tables)} tables for schema: {sch.name}")
             except Exception as e:
