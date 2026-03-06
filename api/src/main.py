@@ -126,9 +126,9 @@ async def list_tables_route(req: TableRequest, http_request: Request):
     If instance_name is not specified, lists tables for all instances within the specified configuration(s).
     If schema_name is not specified, lists tables for all schemas within the specified instance(s).
     """
-    logger.info(f"API: Listing tables for config: {req.config_name if req.config_name else 'all'}, instance: {req.instance_name if req.instance_name else 'all'}, schema: {req.schema_name if req.schema_name else 'all'}")
+    logger.info(f"API: Listing tables for config: {req.config_name if req.config_name else 'all'}, instance: {req.instance_name if req.instance_name else 'all'}, schema: {req.schema_name if req.schema_name else 'all'}, limit: {req.limit if req.limit else 'none'}, offset: {req.offset if req.offset else 'none'}")
     try:
-        data = table_service.list_tables(req.config_name, req.instance_name, req.schema_name)
+        data = table_service.list_tables(req.config_name, req.instance_name, req.schema_name, req.limit, req.offset)
         return api_response(http_request, "Tables retrieved successfully.", data)
     except ValueError as e:
         logger.error(f"API: Listing tables failed: {e}")
