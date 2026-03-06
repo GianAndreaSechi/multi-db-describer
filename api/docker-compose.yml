@@ -9,9 +9,9 @@ services:
       - redis_data:/data
     restart: always # Ensure Redis restarts if it crashes
 
-  api:
+  multi-db-api:
     build:
-      context: .. # Context is now the parent directory (project root)
+      context: ..
       dockerfile: api/Dockerfile # Path is still correct relative to context
     ports:
       - "8000:8000"

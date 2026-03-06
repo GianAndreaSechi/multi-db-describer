@@ -4,6 +4,9 @@ FROM python:3.9-slim-buster
 # Set the working directory in the container
 WORKDIR /app
 
+# Set PYTHONPATH to include the /app directory
+ENV PYTHONPATH=/app
+
 # Copy only the necessary components
 COPY core /app/core
 COPY api /app/api
