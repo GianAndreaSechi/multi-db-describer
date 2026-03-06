@@ -19,14 +19,21 @@ Key features include:
 
 To run the API using Docker, follow these steps:
 
+0. **Using docker-compose:**
+    ```bash
+    docker-compose build
+    
+    docker-compose up
+    ```
+
 1.  **Build the Docker image:**
     ```bash
-    docker build -t multi-db-connector-api .
+    docker build -t multi-db-api .
     ```
 
 2.  **Run the Docker container:**
     ```bash
-    docker run -d --name multi-db-api -p 8000:8000 multi-db-connector-api
+    docker run -d --name multi-db-api -p 8000:8000 multi-db-api
     ```
 
 3.  **Access the API:**
