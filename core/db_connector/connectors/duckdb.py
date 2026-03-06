@@ -2,8 +2,8 @@ import duckdb
 from typing import List, Dict, Any, Optional
 from core.db_connector.interface import BaseConnector
 from core.db_connector.models import Instance, Schema, Table, Column
-from core.db_connector.caching import cache_result
 from loguru import logger
+from ..cache_manager import CacheManager # Import CacheManager
 
 class DuckDBConnector(BaseConnector):
     """
@@ -14,8 +14,8 @@ class DuckDBConnector(BaseConnector):
     def get_type() -> str:
         return "duckdb"
 
-    def __init__(self, connection_params: Dict[str, Any]):
-        super().__init__(connection_params)
+    def __init__(self, connection_params: Dict[str, Any], cache_manager: CacheManager): # Add cache_manager
+        super().__init__(connection_params, cache_manager) # Pass to super
         self.database = connection_params.get("database", ":memory:") # Default to in-memory
 
         # Test connection
@@ -53,54 +53,74 @@ class DuckDBConnector(BaseConnector):
             if conn:
                 conn.close()
 
-    @cache_result(ttl=3600)
-    def list_instances(self) -> List[Instance]:
-        # For DuckDB, the instance is the database file itself or :memory:
-        return [Instance(name=self.database, version=duckdb.__version__)]
+    def list_instances(self, no_cache: bool = False) -> List[Instance]:
+        cache_key = f"duckdb_instances:{self.database}"
+        cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
+        if cached_data:
+            return [Instance(**d) for d in cached_data] # Deserialize to Instance objects
 
-    @cache_result(ttl=3600)
-    def list_schemas(self, instance_name: str) -> List[Schema]:
+        # For DuckDB, the instance is the database file itself or :memory:
+        instances = [Instance(name=self.database, version=duckdb.__version__)]
+        self.cache_manager.set_cached_data(cache_key, [i.model_dump() for i in instances]) # Serialize for caching
+        return instances
+
+    def list_schemas(self, instance_name: str, no_cache: bool = False) -> List[Schema]:
+        cache_key = f"duckdb_schemas:{self.database}:{instance_name}"
+        cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
+        if cached_data:
+            return [Schema(**d) for d in cached_data]
+
         if instance_name != self.database:
             logger.error(f"Instance name '{instance_name}' does not match connected database '{self.database}'")
             raise ValueError(f"Instance name '{instance_name}' does not match connected database '{self.database}'")
         
-        # DuckDB typically uses 'main' as the default schema
-        # We can list attached databases, which can act as schemas
         rows = self._execute_query("PRAGMA database_list;")
         schemas = []
         for row in rows:
-            # The 'name' column in PRAGMA database_list is the schema name
             schemas.append(Schema(name=row["database_name"]))
+        
+        self.cache_manager.set_cached_data(cache_key, [s.model_dump() for s in schemas])
         return schemas
 
-    @cache_result(ttl=3600)
-    def list_tables(self, instance_name: str, schema_name: str) -> List[Table]:
+    def list_tables(self, instance_name: str, schema_name: str, limit: Optional[int] = None, offset: Optional[int] = None, no_cache: bool = False) -> List[Table]:
+        cache_key = f"duckdb_tables:{self.database}:{instance_name}:{schema_name}:{limit}:{offset}"
+        cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
+        if cached_data:
+            return [Table(**d) for d in cached_data]
+
         if instance_name != self.database:
             logger.error(f"Instance name '{instance_name}' does not match connected database '{self.database}'")
             raise ValueError(f"Instance name '{instance_name}' does not match connected database '{self.database}'")
         
-        # Use PRAGMA show_tables to list tables in a specific schema
-        # DuckDB's PRAGMA show_tables doesn't directly filter by schema in a simple way
-        # A more robust way is to query information_schema or similar if available,
-        # but for simplicity, we'll assume tables are within the main database for now.
-        # For more complex schema handling, one might need to adjust the connection or query.
-        
-        # DuckDB's information_schema.tables provides schema_name
         query = f"""
         SELECT table_name
         FROM information_schema.tables
-        WHERE table_schema = '{schema_name}';
+        WHERE table_schema = '{schema_name}'
         """
-        rows = self._execute_query(query)
-        return [Table(name=row["table_name"], schema_name=schema_name) for row in rows]
+        
+        if limit is not None:
+            query += f" LIMIT {limit}"
+        if offset is not None:
+            query += f" OFFSET {offset}"
 
-    @cache_result(ttl=3600)
-    def describe_table(self, instance_name: str, schema_name: str, table_name: str) -> List[Column]:
+        query += ";"
+
+        rows = self._execute_query(query)
+        tables = [Table(name=row["table_name"], schema_name=schema_name) for row in rows]
+        
+        self.cache_manager.set_cached_data(cache_key, [t.model_dump() for t in tables])
+        return tables
+
+    def describe_table(self, instance_name: str, schema_name: str, table_name: str, no_cache: bool = False) -> List[Column]:
+        cache_key = f"duckdb_describe_table:{self.database}:{instance_name}:{schema_name}:{table_name}"
+        cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
+        if cached_data:
+            return [Column(**d) for d in cached_data]
+
         if instance_name != self.database:
             logger.error(f"Instance name '{instance_name}' does not match connected database '{self.database}'")
             raise ValueError(f"Instance name '{instance_name}' does not match connected database '{self.database}'")
         
-        # Use PRAGMA table_info to get column details
         query = f"PRAGMA table_info('{schema_name}.{table_name}');"
         rows = self._execute_query(query)
         
@@ -115,4 +135,6 @@ class DuckDBConnector(BaseConnector):
                     comment=None # DuckDB PRAGMA table_info does not provide column comments directly
                 )
             )
+        
+        self.cache_manager.set_cached_data(cache_key, [c.model_dump() for c in columns])
         return columns

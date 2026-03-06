@@ -1,9 +1,9 @@
 import sqlite3
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from core.db_connector.interface import BaseConnector
 from core.db_connector.models import Instance, Schema, Table, Column
-from core.db_connector.caching import cache_result
-from loguru import logger # New import
+from loguru import logger
+from ..cache_manager import CacheManager # Import CacheManager
 
 class SQLiteConnector(BaseConnector):
     """
@@ -14,8 +14,8 @@ class SQLiteConnector(BaseConnector):
     def get_type() -> str:
         return "sqlite"
 
-    def __init__(self, connection_params: Dict[str, Any]):
-        super().__init__(connection_params)
+    def __init__(self, connection_params: Dict[str, Any], cache_manager: CacheManager): # Add cache_manager
+        super().__init__(connection_params, cache_manager) # Pass to super
         self.db_path = connection_params.get("database")
         if not self.db_path:
             logger.error("SQLite connector requires 'database' path in connection_params.")
@@ -46,31 +46,61 @@ class SQLiteConnector(BaseConnector):
             if conn:
                 conn.close()
 
-    @cache_result(ttl=3600)
-    def list_instances(self) -> List[Instance]:
-        # For SQLite, the instance is the database file itself
-        return [Instance(name=self.db_path, version=sqlite3.sqlite_version)]
+    def list_instances(self, no_cache: bool = False) -> List[Instance]:
+        cache_key = f"sqlite_instances:{self.db_path}"
+        cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
+        if cached_data:
+            return [Instance(**d) for d in cached_data]
 
-    @cache_result(ttl=3600)
-    def list_schemas(self, instance_name: str) -> List[Schema]:
+        # For SQLite, the instance is the database file itself
+        instances = [Instance(name=self.db_path, version=sqlite3.sqlite_version)]
+        self.cache_manager.set_cached_data(cache_key, [i.model_dump() for i in instances])
+        return instances
+
+    def list_schemas(self, instance_name: str, no_cache: bool = False) -> List[Schema]:
+        cache_key = f"sqlite_schemas:{self.db_path}:{instance_name}"
+        cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
+        if cached_data:
+            return [Schema(**d) for d in cached_data]
+
         # SQLite typically has a single 'main' schema
         if instance_name != self.db_path:
             logger.error(f"Instance name '{instance_name}' does not match connected database '{self.db_path}'")
             raise ValueError(f"Instance name '{instance_name}' does not match connected database '{self.db_path}'")
-        return [Schema(name="main")]
+        schemas = [Schema(name="main")]
+        self.cache_manager.set_cached_data(cache_key, [s.model_dump() for s in schemas])
+        return schemas
 
-    @cache_result(ttl=3600)
-    def list_tables(self, instance_name: str, schema_name: str) -> List[Table]:
+    def list_tables(self, instance_name: str, schema_name: str, limit: Optional[int] = None, offset: Optional[int] = None, no_cache: bool = False) -> List[Table]:
+        cache_key = f"sqlite_tables:{self.db_path}:{instance_name}:{schema_name}:{limit}:{offset}"
+        cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
+        if cached_data:
+            return [Table(**d) for d in cached_data]
+
         if instance_name != self.db_path or schema_name != "main":
             logger.error("Invalid instance or schema for SQLite.")
             raise ValueError("Invalid instance or schema for SQLite.")
         
-        query = "SELECT name FROM sqlite_master WHERE type='table';"
-        rows = self._execute_query(query)
-        return [Table(name=row["name"], schema_name=schema_name) for row in rows]
+        query = "SELECT name FROM sqlite_master WHERE type='table'"
+        
+        if limit is not None:
+            query += f" LIMIT {limit}"
+        if offset is not None:
+            query += f" OFFSET {offset}"
 
-    @cache_result(ttl=3600)
-    def describe_table(self, instance_name: str, schema_name: str, table_name: str) -> List[Column]:
+        query += ";"
+
+        rows = self._execute_query(query)
+        tables = [Table(name=row["name"], schema_name=schema_name) for row in rows]
+        self.cache_manager.set_cached_data(cache_key, [t.model_dump() for t in tables])
+        return tables
+
+    def describe_table(self, instance_name: str, schema_name: str, table_name: str, no_cache: bool = False) -> List[Column]:
+        cache_key = f"sqlite_describe_table:{self.db_path}:{instance_name}:{schema_name}:{table_name}"
+        cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
+        if cached_data:
+            return [Column(**d) for d in cached_data]
+
         if instance_name != self.db_path or schema_name != "main":
             logger.error("Invalid instance or schema for SQLite.")
             raise ValueError("Invalid instance or schema for SQLite.")
@@ -89,4 +119,5 @@ class SQLiteConnector(BaseConnector):
                     comment=None # SQLite PRAGMA does not provide column comments directly
                 )
             )
+        self.cache_manager.set_cached_data(cache_key, [c.model_dump() for c in columns])
         return columns
