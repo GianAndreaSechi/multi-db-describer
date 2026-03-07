@@ -84,52 +84,28 @@ You would first define the tools in a format that the LLM provider's API underst
 
 Here is a pseudo-code example of how you might configure a Gemini or Claude chat session to use the MCP tools.
 
-```python
-# This is a conceptual example. The actual implementation will vary.
-# Refer to the documentation of your specific LLM provider.
+Go into ``` /Users/<usernmae>/.gemini/settings.json ``` and put this into the existing configuration
 
-from my_llm_provider import Chat, ToolConfig
-
-# The endpoint where the MCP server is running
-mcp_server_url = "http://localhost:8001/tools" # Example URL
-
-# The tool definition, which could be fetched from the MCP server
-# or loaded from a file.
-mcp_tool_definitions = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_available_connectors",
-            "description": "Get a list of all available database connector types from the API service.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "no_cache": {
-                        "type": "boolean",
-                        "default": False
-                    }
-                }
-            }
-        }
-    },
-    # ... other tool definitions
-]
-
-
-# Configure the chat session to use the tools
-tool_config = ToolConfig(
-    type="tool_server",
-    endpoint=mcp_server_url,
-    # Or you might pass the definitions directly
-    # tools=mcp_tool_definitions
-)
-
-chat = Chat(model="gemini-pro" or "claude-3-opus", tool_config=tool_config)
-
-# Now you can ask the LLM questions that require using the tools
-response = chat.send_message("List all available connectors.")
-
-print(response)
+```json
+{
+  ...
+  "mcpServers": {
+    "multi-db-mcp-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "http://0.0.0.0:8001/mcp"
+      ]
+    }
+  },
+  "general": {
+    "sessionRetention": {
+      "enabled": true,
+      "maxAge": "30d",
+      "warningAcknowledged": true
+    }
+  },
+...
+}
 ```
-
-In this example, the LLM would see the user's prompt, recognize that it needs to call the `get_available_connectors` tool, and make a request to the MCP server to execute it. The MCP server would then process the request and return the result to the LLM, which would then use that result to formulate its final answer to the user.
