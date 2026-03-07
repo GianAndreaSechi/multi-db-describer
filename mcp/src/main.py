@@ -1,3 +1,4 @@
+import os
 from fastmcp import FastMCP
 from loguru import logger
 from typing import Optional
@@ -9,11 +10,7 @@ from .models.requests.describe_table_request import DescribeTableRequest
 from .models.responses.generic_response import GenericResponse
 from .constants import TOON_RESPONSE_FORMAT
 
-mcp = FastMCP(
-    title="Multi-DB Connector Control Plane (MCP)",
-    description="Control plane for managing and interacting with various database connectors.",
-    version="0.1.0",
-)
+mcp = FastMCP("Multi-DB Connector Control Plane (MCP)")
 
 @mcp.tool()
 async def get_available_connectors(no_cache: Optional[bool] = False) -> GenericResponse:
@@ -71,5 +68,12 @@ async def describe_table(request: DescribeTableRequest, no_cache: Optional[bool]
     return GenericResponse(message=f"Description for table '{request.table_name}' retrieved successfully from API.", data=api_response.get("data"))
 
 if __name__ == "__main__":
-    logger.info("Starting MCP server...")
-    mcp.run()
+    transport = os.getenv("MCP_TRANSPORT", "http")
+    host = os.getenv("MCP_HOST", "0.0.0.0")
+    port = int(os.getenv("MCP_PORT", "8000"))
+    
+    logger.info(f"Starting MCP server with {transport} transport...")
+    if transport == "http":
+        mcp.run(transport="http", host=host, port=port)
+    else:
+        mcp.run(transport="stdio")
