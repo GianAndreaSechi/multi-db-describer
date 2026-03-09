@@ -1,12 +1,13 @@
+import os
 from loguru import logger
 import httpx
 from typing import Optional, Dict, Any
-from toon_format import decode
+import toons
 from ..constants import TOON_RESPONSE_FORMAT, JSON_RESPONSE_FORMAT
 
 class ApiClient:
-    def __init__(self, base_url: str = "http://localhost:8000"):
-        self.base_url = base_url
+    def __init__(self, base_url: Optional[str] = None):
+        self.base_url = base_url or os.getenv("API_BASE_URL", "http://localhost:8000")
         self.client = httpx.AsyncClient(base_url=self.base_url)
 
     async def post(self, endpoint: str, payload: Dict[str, Any], no_cache: bool = False, response_format: str = JSON_RESPONSE_FORMAT) -> Dict[str, Any]:
@@ -26,7 +27,7 @@ class ApiClient:
             response = await self.client.post(endpoint, json=payload, headers=headers)
             response.raise_for_status()
             if response_format == TOON_RESPONSE_FORMAT:
-                return decode(response.content)
+                return toons.loads(response.content.decode("utf-8"))
             else:
                 return response.json()
         except httpx.HTTPStatusError as e:
@@ -56,7 +57,7 @@ class ApiClient:
             response = await self.client.get(endpoint, headers=headers)
             response.raise_for_status()
             if response_format == TOON_RESPONSE_FORMAT:
-                return decode(response.content)
+                return toons.loads(response.content.decode("utf-8"))
             else:
                 return response.json()
         except httpx.HTTPStatusError as e:

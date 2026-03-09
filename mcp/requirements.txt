@@ -2,4 +2,4 @@ fastmcp
 loguru
 python-dotenv
 httpx
-toon-format
+toons
