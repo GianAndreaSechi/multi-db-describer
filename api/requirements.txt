@@ -3,4 +3,4 @@ fastapi
 uvicorn
 loguru
 python-dotenv
-toon-format
+toons
