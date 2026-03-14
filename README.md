@@ -76,4 +76,4 @@ We welcome contributions! As an alpha project, there are many ways to help:
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [Apache License 2.0](LICENSE).
