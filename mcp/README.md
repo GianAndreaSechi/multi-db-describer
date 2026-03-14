@@ -1,8 +1,8 @@
-# MCP: Multi-DB Connector Control Plane
+# MCP: Multi-DB Describer Control Plane
 
 ## Overview
 
-The Multi-DB Connector Control Plane (MCP) is a component designed to expose the functionalities of the Multi-DB Connector API to Large Language Models (LLMs) and other AI agents. It acts as a bridge, translating the API's capabilities into a set of "tools" that an LLM can understand and execute.
+The Multi-DB Describer Control Plane (MCP) is a component designed to expose the functionalities of the Multi-DB Connector API to Large Language Models (LLMs) and other AI agents. It acts as a bridge, translating the API's capabilities into a set of "tools" that an LLM can understand and execute.
 
 Built with `fastmcp`, this control plane follows the Model Context Protocol, a standardized way to connect LLMs to external functionalities.
 
@@ -47,13 +47,13 @@ The following tools are exposed by the MCP:
 ### Prerequisites
 
 - Python 3.8+
-- An instance of the Multi-DB Connector API running.
+- An instance of the Multi-DB Descriver API running (MCP Based on APIs)
 
 ### Installation
 
 1.  Navigate to the `mcp` directory:
     ```bash
-    cd /path/to/multi-db-connector/mcp
+    cd /path/to/multi-db-describer/mcp
     ```
 2.  Install the required dependencies:
     ```bash
