@@ -1,7 +1,7 @@
 import sqlite3
 from typing import List, Dict, Any, Optional
 from core.db_connector.interface import BaseConnector
-from core.db_connector.models import Instance, Schema, Table, Column
+from core.db_connector.models import Instance, Schema, Table, Column, TableDescription
 from loguru import logger
 from ..cache_manager import CacheManager # Import CacheManager
 
@@ -95,11 +95,11 @@ class SQLiteConnector(BaseConnector):
         self.cache_manager.set_cached_data(cache_key, [t.model_dump() for t in tables])
         return tables
 
-    def describe_table(self, instance_name: str, schema_name: str, table_name: str, no_cache: bool = False) -> List[Column]:
+    def describe_table(self, instance_name: str, schema_name: str, table_name: str, no_cache: bool = False) -> TableDescription:
         cache_key = f"sqlite_describe_table:{self.db_path}:{instance_name}:{schema_name}:{table_name}"
         cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
         if cached_data:
-            return [Column(**d) for d in cached_data]
+            return TableDescription(**cached_data)
 
         if instance_name != self.db_path or schema_name != "main":
             logger.error("Invalid instance or schema for SQLite.")
@@ -119,5 +119,15 @@ class SQLiteConnector(BaseConnector):
                     comment=None # SQLite PRAGMA does not provide column comments directly
                 )
             )
-        self.cache_manager.set_cached_data(cache_key, [c.model_dump() for c in columns])
-        return columns
+        
+        table_description = TableDescription(
+            instance_name=instance_name,
+            schema_name=schema_name,
+            table_name=table_name,
+            columns=columns,
+            primary_key=None, # Simplified for now
+            foreign_keys=[],
+            indexes=[]
+        )
+        self.cache_manager.set_cached_data(cache_key, table_description.model_dump())
+        return table_description

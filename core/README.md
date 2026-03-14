@@ -22,6 +22,17 @@ The `core` component is written in Python and is designed to be highly modular a
 
 -   **Extensibility**: The design allows for easy addition of new database connectors by simply implementing the `BaseConnector` interface and registering it with the `ConnectorManager`.
 
+## Connectors
+### Available
+- MySQL/MariaDB
+- DuckeBD
+- SQLite
+
+### To be implemented
+- Postgres
+- Apache Presto/Athena
+- ...others
+
 ## Docker
 
 The `core` component is a library. While it doesn't run as a standalone application, a `docker-compose.yml` file is provided in the `core/` directory to facilitate development, testing, and isolated usage of the `core` library with its Redis caching capabilities.

@@ -1,7 +1,7 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 from typing import Any, Optional
-from toon_format import encode
+import toons
 from loguru import logger
 
 from api.src.models.response.generic_response import GenericResponse
@@ -17,7 +17,7 @@ def api_response(request: Request, message: str, data: Any):
 
     if "application/toon" in accept_header:
         logger.info("Returning TOON response")
-        toon_data = encode(response_data)
+        toon_data = toons.dumps(response_data)
         return Response(content=toon_data, media_type="application/toon")
     else:
         logger.info("Returning JSON response")

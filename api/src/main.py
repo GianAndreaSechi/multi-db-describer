@@ -3,19 +3,18 @@ from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 from loguru import logger
 import os
-# Removed json import
 
 from core.db_connector.manager import ConnectorManager
 from core.db_connector.models import (
     Instance, Schema, Table,
     TableDescription
 )
-from core.db_connector.cache_manager import CacheManager # Import CacheManager
-from api.src.services.config_service import ConfigService # Updated import
-from api.src.services.instance_service import InstanceService # New import
-from api.src.services.schema_service import SchemaService # New import
-from api.src.services.table_service import TableService # New import
-from api.src.services.describe_table_service import DescribeTableService # New import
+from core.db_connector.cache_manager import CacheManager
+from api.src.services.config_service import ConfigService
+from api.src.services.instance_service import InstanceService
+from api.src.services.schema_service import SchemaService
+from api.src.services.table_service import TableService
+from api.src.services.describe_table_service import DescribeTableService
 
 from api.src.models.requests.connection_request import ConnectionRequest
 from api.src.models.requests.instance_request import InstanceRequest
@@ -39,7 +38,7 @@ cache_manager = CacheManager(
 )
 
 # Initialize ConnectorManager and Services
-connector_manager = ConnectorManager(cache_manager) # Pass cache_manager
+connector_manager = ConnectorManager(cache_manager)
 config_service = ConfigService(connector_manager)
 instance_service = InstanceService(config_service, connector_manager)
 schema_service = SchemaService(config_service, connector_manager)

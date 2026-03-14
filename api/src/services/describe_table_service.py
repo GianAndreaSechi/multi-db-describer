@@ -6,7 +6,7 @@ from core.db_connector.models import Instance, Schema, Table, TableDescription
 from api.src.services.config_service import ConfigService
 
 class DescribeTableService:
-    def __init__(self, config_service: ConfigService, connector_manager: ConnectorManager): # Removed instance_service, schema_service, table_service
+    def __init__(self, config_service: ConfigService, connector_manager: ConnectorManager):
         self.config_service = config_service
         self.connector_manager = connector_manager
 
@@ -40,7 +40,7 @@ class DescribeTableService:
                     for sch in schemas_to_process:
                         tables_to_process = []
                         if table_name:
-                            tables_to_process.append(Table(name=table_name))
+                            tables_to_process.append(Table(name=table_name, schema_name=sch.name))
                         else:
                             # Directly get tables using ConfigService and ConnectorManager
                             connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])

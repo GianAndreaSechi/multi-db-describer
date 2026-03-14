@@ -1,30 +1,17 @@
 from typing import Dict, Any, List, Optional
 from loguru import logger
-import json
 import os
 
 from core.db_connector.manager import ConnectorManager
+# Importiamo le configurazioni dal nuovo file Python
+from api.src.configurations.db_configurations import DB_CONFIGURATIONS
 
 class ConfigService:
-    # Define a default path relative to the service file
-    DEFAULT_CONFIG_FILE_PATH = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..", "configurations", "db_configurations.json"
-    )
-
-    def __init__(self, connector_manager: ConnectorManager, config_file_path: Optional[str] = None):
+    def __init__(self, connector_manager: ConnectorManager):
         self.connector_manager = connector_manager
-        self.config_file_path = config_file_path if config_file_path else self.DEFAULT_CONFIG_FILE_PATH
-        self.db_configurations: Dict[str, Dict[str, Any]] = {}
-        self._load_configurations()
-
-    def _load_configurations(self):
-        if not os.path.exists(self.config_file_path):
-            raise FileNotFoundError(f"Configuration file not found: {self.config_file_path}")
-        
-        with open(self.config_file_path, 'r') as f:
-            self.db_configurations = json.load(f)
-        logger.info(f"ConfigService: Loaded {len(self.db_configurations)} database configurations from {self.config_file_path}")
+        # Utilizziamo direttamente il dizionario importato
+        self.db_configurations: Dict[str, Dict[str, Any]] = DB_CONFIGURATIONS
+        logger.info(f"ConfigService: Initialized with {len(self.db_configurations)} database configurations.")
 
     def get_available_configurations(self) -> List[str]:
         logger.info("ConfigService: Fetching available configurations.")

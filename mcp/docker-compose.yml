@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:6-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+
+  multi-db-api:
+    build:
+      context: ..
+      dockerfile: api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_TTL_SECONDS: 86400
+      CACHE_KEY_PREFIX: multi-db-connector
+    depends_on:
+      - redis
+    volumes:
+      - ../api:/app/api
+      - ../core:/app/core
+    restart: always
+
+  multi-db-mcp:
+    build:
+      context: ..
+      dockerfile: mcp/Dockerfile
+    ports:
+      - "8001:8000" # MCP will run on port 8001 on the host
+    environment:
+      API_BASE_URL: http://multi-db-api:8000 # MCP connects to the API service
+   # depends_on:
+   #   - multi-db-api # MCP depends on the API service
+    volumes:
+      - ../mcp:/app/mcp
+    restart: always
+
+volumes:
+  redis_data:

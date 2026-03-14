@@ -6,7 +6,7 @@ from core.db_connector.models import Instance, Schema
 from api.src.services.config_service import ConfigService
 
 class SchemaService:
-    def __init__(self, config_service: ConfigService, connector_manager: ConnectorManager): # Removed instance_service
+    def __init__(self, config_service: ConfigService, connector_manager: ConnectorManager):
         self.config_service = config_service
         self.connector_manager = connector_manager
 
