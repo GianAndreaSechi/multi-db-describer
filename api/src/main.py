@@ -24,7 +24,7 @@ from api.src.models.requests.describe_table_request import DescribeTableRequest
 from api.src.services.response_service import api_response
 
 app = FastAPI(
-    title="Multi-DB Connector API",
+    title="Multi DB Describer API",
     description="API for connecting to various databases and performing introspection.",
     version="0.1.0",
 )
@@ -182,3 +182,8 @@ async def describe_table_route(req: DescribeTableRequest, http_request: Request,
     except Exception as e:
         logger.exception(f"API: An unexpected error occurred while describing table for config: {req.config_name}, instance: {req.instance_name}, schema: {req.schema_name}, table: {req.table_name}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("api.src.main:app", host="0.0.0.0", port=8000)

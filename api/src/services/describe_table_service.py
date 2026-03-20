@@ -16,42 +16,28 @@ class DescribeTableService:
 
         for c_name in config_names_to_process:
             try:
-                details = self.config_service._get_connector_details(c_name) # Get details once per config
-                
-                instances_to_process = []
-                if instance_name:
-                    instances_to_process.append(Instance(name=instance_name, version=""))
-                else:
-                    # Directly get instances using ConfigService and ConnectorManager
-                    connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
-                    instances_for_config = connector.list_instances(no_cache=no_cache)
-                    instances_to_process.extend(instances_for_config)
+                hosts_to_process = [instance_name] if instance_name else self.config_service._get_hosts(c_name)
 
-                for inst in instances_to_process:
+                for host in hosts_to_process:
+                    connector = self.config_service._get_connector_for_host(c_name, host)
+
                     schemas_to_process = []
                     if schema_name:
                         schemas_to_process.append(Schema(name=schema_name))
                     else:
-                        # Directly get schemas using ConfigService and ConnectorManager
-                        connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
-                        schemas_for_instance = connector.list_schemas(instance_name=inst.name, no_cache=no_cache)
-                        schemas_to_process.extend(schemas_for_instance)
+                        schemas_to_process = connector.list_schemas(instance_name=host, no_cache=no_cache)
 
                     for sch in schemas_to_process:
                         tables_to_process = []
                         if table_name:
                             tables_to_process.append(Table(name=table_name, schema_name=sch.name))
                         else:
-                            # Directly get tables using ConfigService and ConnectorManager
-                            connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
-                            tables_for_schema = connector.list_tables(instance_name=inst.name, schema_name=sch.name, no_cache=no_cache)
-                            tables_to_process.extend(tables_for_schema)
+                            tables_to_process = connector.list_tables(instance_name=host, schema_name=sch.name, no_cache=no_cache)
 
                         for tbl in tables_to_process:
-                            logger.info(f"DescribeTableService: Describing table: {tbl.name} in schema: {sch.name}, instance: {inst.name}, config: {c_name}")
-                            connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
+                            logger.info(f"DescribeTableService: Describing table: {tbl.name} in schema: {sch.name}, host: {host}, config: {c_name}")
                             table_description = connector.describe_table(
-                                instance_name=inst.name,
+                                instance_name=host,
                                 schema_name=sch.name,
                                 table_name=tbl.name,
                                 no_cache=no_cache

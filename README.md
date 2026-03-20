@@ -1,79 +1,95 @@
-# Multi-DB Describer
+# multi-db-describer
 
-**Multi-DB Describer** is an open-source toolset designed to provide a unified, standardized way to introspect and describe various database systems. Whether you are building a data catalog, a database administration tool, or integrating database knowledge into AI agents, this project offers a modular architecture to bridge the gap between different database engines.
+A lightweight layer to help LLMs and applications understand database structures across heterogeneous data stores.
 
-> [!CAUTION]
-> **Status: Alpha**
-> This project is currently in an alpha state. APIs and internal structures are subject to change. It is open for use and contribution, but should be handled with care in production environments.
+## Overview
 
----
+When working with multiple databases, one of the main challenges—especially with LLMs—is providing reliable, structured context about what data actually exists.
 
-## Project Structure & Architecture
+`multi-db-describer` is an experimental project that aims to:
+- introspect multiple databases
+- expose their structure in a consistent format
+- make this information accessible to applications and AI systems
 
-The project is divided into three main components, each serving a specific layer of the stack:
+## Features
 
-### 1. [Core](./core) (The Engine)
-The `core` is a Python library that acts as the fundamental abstraction layer.
-- **Purpose**: Provides a unified interface (`BaseConnector`) to interact with different databases (MySQL, SQLite, DuckDB, and more to come).
-- **Key Features**: 
-    - Pydantic models for database metadata (Instances, Schemas, Tables, Columns).
-    - Built-in Redis caching to optimize introspection performance.
-    - Extensible architecture to easily add new database connectors.
+- Python core library (embeddable)
+- API layer + MCP interface
+- Multi-database support:
+  - MySQL
+  - DuckDB
+  - SQLite
+- Table discovery and schema description (`describe`)
+- Redis caching for performance optimization
 
-### 2. [API](./api) (The Service)
-A high-performance REST API built with **FastAPI** that wraps the `core` library.
-- **Purpose**: Exposes the database introspection logic over HTTP, making it accessible to any language or platform.
-- **Key Features**:
-    - Endpoints for listing configurations, instances, schemas, and tables.
-    - Support for multiple response formats, including standard JSON and **TOON** (Tree-Oriented Object Notation) for efficient data representation.
-    - Integrated with the `core` caching layer.
+## Why this project
 
-### 3. [MCP](./mcp) (The AI Bridge)
-An implementation of the **Model Context Protocol (MCP)** using `fastmcp`.
-- **Purpose**: Acts as a bridge between Large Language Models (LLMs) and the Multi-DB Describer API.
-- **Key Features**:
-    - Translates API endpoints into "tools" that AI agents (like Gemini, Claude, or IDE-integrated assistants) can understand and execute.
-    - Allows AI agents to autonomously explore database structures to better assist users with queries, documentation, or analysis.
+LLMs are powerful, but without proper grounding they tend to:
+- hallucinate tables or columns
+- generate invalid queries
+- lack awareness of real data structures
 
----
+This project acts as a **context provider layer**, enabling:
+- better prompt grounding
+- safer query generation
+- improved data exploration workflows
 
-## How They Connect
+## Future direction
 
-The components are designed to work together in a tiered architecture:
+A key next step is to:
+- feed database metadata into AI models
+- generate enriched context (descriptions, inferred relationships, usage hints)
+- persist this knowledge over time
 
-1.  **Core** is imported and used by the **API**.
-2.  **API** runs as a standalone service (optionally in Docker) and handles the actual database connections.
-3.  **MCP** runs as a client/bridge that talks to the **API** and exposes its capabilities to **MCP-compliant LLM clients**.
+This would allow building a **self-improving semantic layer** on top of raw database structures.
 
-```mermaid
-graph TD
-    LLM[AI Agent / IDE] -- Uses Tools --> MCP[MCP Server]
-    MCP -- REST Requests --> API[FastAPI Service]
-    API -- Method Calls --> Core[Core Library]
-    Core -- SQL --> DBs[(Multiple Databases)]
-    Core -- Cache --> Redis[(Redis)]
+This part is still experimental and requires further design and iteration.
+
+## Current status
+
+⚠️ Alpha
+
+Limitations:
+- limited database connectors
+- basic iteration logic when parameters are missing
+- cache strategy can be improved
+- packaging not finalized yet (PyPI planned)
+
+## Installation
+
+_(coming soon – packaging in progress)_
+
+## Example (Service usage)
+
+The library is organized into specialized services that handle orchestration across multiple database configurations.
+
+```python
+from core.db_connector.manager import ConnectorManager
+from core.db_connector.cache_manager import CacheManager
+from api.src.services.config_service import ConfigService
+from api.src.services.table_service import TableService
+from api.src.services.describe_table_service import DescribeTableService
+
+# 1. Setup the core managers
+cache = CacheManager(host="localhost", port=6379)
+manager = ConnectorManager(cache)
+
+# 2. Initialize the configuration service (loads from db_configurations.py)
+config = ConfigService(manager)
+
+# 3. Use specialized services for introspection
+table_service = TableService(config, manager)
+describe_service = DescribeTableService(config, manager)
+
+# List tables for a specific configuration
+tables = table_service.list_tables(config_name="my_mysql_db")
+
+# Describe a specific table
+details = describe_service.describe_table(
+    config_name="my_mysql_db", 
+    table_name="users"
+)
+
+for col in details[0].columns:
+    print(f"{col.name}: {col.type}")
 ```
-
----
-
-## Getting Started
-
-Each subproject contains its own `README.md` with specific installation and configuration instructions:
-
-- To use it as a library in your Python project, see [Core Setup](./core/README.md).
-- To deploy the introspection service, see [API Setup](./api/README.md).
-- To enable AI agent integration, see [MCP Setup](./mcp/README.md).
-
----
-
-## Contributing
-
-We welcome contributions! As an alpha project, there are many ways to help:
-- Implementing new connectors (Postgres, Presto, Snowflake, etc.).
-- Improving the TOON serialization format.
-- Adding more comprehensive test suites.
-- Enhancing documentation.
-
-## License
-
-This project is licensed under the [Apache License 2.0](LICENSE).

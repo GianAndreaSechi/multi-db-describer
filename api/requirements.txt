@@ -4,3 +4,4 @@ uvicorn
 loguru
 python-dotenv
 toons
+-e /app/core

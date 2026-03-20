@@ -16,23 +16,14 @@ class SchemaService:
 
         for c_name in config_names_to_process:
             try:
-                details = self.config_service._get_connector_details(c_name) # Get details once per config
-                
-                instances_to_process = []
-                if instance_name:
-                    instances_to_process.append(Instance(name=instance_name, version=""))
-                else:
-                    # Directly get instances using ConfigService and ConnectorManager
-                    connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
-                    instances_for_config = connector.list_instances(no_cache=no_cache)
-                    instances_to_process.extend(instances_for_config)
+                hosts_to_process = [instance_name] if instance_name else self.config_service._get_hosts(c_name)
 
-                for inst in instances_to_process:
-                    logger.info(f"SchemaService: Listing schemas for config: {c_name}, instance: {inst.name}")
-                    connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
-                    schemas = connector.list_schemas(instance_name=inst.name, no_cache=no_cache)
+                for host in hosts_to_process:
+                    logger.info(f"SchemaService: Listing schemas for config: {c_name}, host: {host}")
+                    connector = self.config_service._get_connector_for_host(c_name, host)
+                    schemas = connector.list_schemas(instance_name=host, no_cache=no_cache)
                     all_schemas.extend(schemas)
-                    logger.info(f"SchemaService: Found {len(schemas)} schemas for instance: {inst.name}")
+                    logger.info(f"SchemaService: Found {len(schemas)} schemas for host: {host}")
             except Exception as e:
                 logger.warning(f"SchemaService: Could not list schemas for configuration {c_name} and instance {instance_name if instance_name else 'all'}: {e}")
         return all_schemas

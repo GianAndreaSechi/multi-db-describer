@@ -2,6 +2,7 @@ import sqlite3
 from typing import List, Dict, Any, Optional
 from core.db_connector.interface import BaseConnector
 from core.db_connector.models import Instance, Schema, Table, Column, TableDescription
+from core.db_connector.models.table_details import PrimaryKey, ForeignKey, Index
 from loguru import logger
 from ..cache_manager import CacheManager # Import CacheManager
 
@@ -34,7 +35,7 @@ class SQLiteConnector(BaseConnector):
         """Helper to execute a query and return results as list of dicts."""
         conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
             conn.row_factory = sqlite3.Row # Return rows as dict-like objects
             cursor = conn.cursor()
             cursor.execute(query, params)
@@ -120,14 +121,56 @@ class SQLiteConnector(BaseConnector):
                 )
             )
         
+        primary_key = self._get_primary_key_details(table_name, rows)
+        foreign_keys = self._get_foreign_key_details(table_name)
+        indexes = self._get_index_details(table_name)
+
         table_description = TableDescription(
             instance_name=instance_name,
             schema_name=schema_name,
             table_name=table_name,
             columns=columns,
-            primary_key=None, # Simplified for now
-            foreign_keys=[],
-            indexes=[]
+            primary_key=primary_key,
+            foreign_keys=foreign_keys,
+            indexes=indexes
         )
         self.cache_manager.set_cached_data(cache_key, table_description.model_dump())
         return table_description
+
+    def _get_primary_key_details(self, table_name: str, table_info_rows: List[Dict]) -> Optional[PrimaryKey]:
+        # PRAGMA table_info rows already fetched: pk > 0 means PK column, value is position
+        pk_columns = [row["name"] for row in sorted(
+            (r for r in table_info_rows if r["pk"] > 0),
+            key=lambda r: r["pk"]
+        )]
+        return PrimaryKey(column_names=pk_columns) if pk_columns else None
+
+    def _get_foreign_key_details(self, table_name: str) -> List[ForeignKey]:
+        rows = self._execute_query(f"PRAGMA foreign_key_list('{table_name}');")
+        foreign_keys = []
+        for row in rows:
+            foreign_keys.append(ForeignKey(
+                column_name=row["from"],
+                referenced_table=row["table"],
+                referenced_column=row["to"],
+                constraint_name=None
+            ))
+        return foreign_keys
+
+    def _get_index_details(self, table_name: str) -> List[Index]:
+        index_list = self._execute_query(f"PRAGMA index_list('{table_name}');")
+        indexes = []
+        for idx in index_list:
+            index_name = idx["name"]
+            is_unique = bool(idx["unique"])
+            is_primary = idx.get("origin") == "pk"
+            col_rows = self._execute_query(f"PRAGMA index_info('{index_name}');")
+            col_names = [r["name"] for r in sorted(col_rows, key=lambda r: r["seqno"])]
+            indexes.append(Index(
+                name=index_name,
+                column_names=col_names,
+                is_unique=is_unique,
+                is_primary=is_primary,
+                type=None
+            ))
+        return indexes

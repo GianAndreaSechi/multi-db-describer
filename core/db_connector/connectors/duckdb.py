@@ -1,7 +1,9 @@
+import re
 import duckdb
 from typing import List, Dict, Any, Optional
 from core.db_connector.interface import BaseConnector
 from core.db_connector.models import Instance, Schema, Table, Column, TableDescription
+from core.db_connector.models.table_details import PrimaryKey, ForeignKey, Index
 from loguru import logger
 from ..cache_manager import CacheManager # Import CacheManager
 
@@ -29,7 +31,7 @@ class DuckDBConnector(BaseConnector):
 
     def _get_connection(self) -> duckdb.DuckDBPyConnection:
         """Helper to get a database connection."""
-        return duckdb.connect(database=self.database, read_only=False)
+        return duckdb.connect(database=self.database, read_only=True)
 
     def _execute_query(self, query: str, params: Optional[tuple] = None) -> List[Dict[str, Any]]:
         """Helper to execute a query and return results as list of dicts."""
@@ -136,14 +138,86 @@ class DuckDBConnector(BaseConnector):
                 )
             )
         
+        primary_key = self._get_primary_key_details(schema_name, table_name)
+        foreign_keys = self._get_foreign_key_details(schema_name, table_name)
+        indexes = self._get_index_details(schema_name, table_name)
+
         table_description = TableDescription(
             instance_name=instance_name,
             schema_name=schema_name,
             table_name=table_name,
             columns=columns,
-            primary_key=None, # Simplified for now
-            foreign_keys=[],
-            indexes=[]
+            primary_key=primary_key,
+            foreign_keys=foreign_keys,
+            indexes=indexes
         )
         self.cache_manager.set_cached_data(cache_key, table_description.model_dump())
         return table_description
+
+    def _get_primary_key_details(self, schema_name: str, table_name: str) -> Optional[PrimaryKey]:
+        query = f"""
+            SELECT constraint_column_names
+            FROM duckdb_constraints()
+            WHERE table_name = '{table_name}'
+              AND schema_name = '{schema_name}'
+              AND constraint_type = 'PRIMARY KEY'
+        """
+        rows = self._execute_query(query)
+        if rows:
+            col_names = rows[0].get('constraint_column_names', [])
+            if isinstance(col_names, list) and col_names:
+                return PrimaryKey(column_names=col_names)
+        return None
+
+    def _get_foreign_key_details(self, schema_name: str, table_name: str) -> List[ForeignKey]:
+        query = f"""
+            SELECT
+                kcu.column_name,
+                ccu.table_name AS referenced_table,
+                ccu.column_name AS referenced_column,
+                tc.constraint_name
+            FROM information_schema.table_constraints AS tc
+            JOIN information_schema.key_column_usage AS kcu
+                ON tc.constraint_name = kcu.constraint_name
+                AND tc.table_schema = kcu.table_schema
+                AND tc.table_name = kcu.table_name
+            JOIN information_schema.constraint_column_usage AS ccu
+                ON ccu.constraint_name = tc.constraint_name
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+              AND tc.table_name = '{table_name}'
+              AND tc.table_schema = '{schema_name}'
+        """
+        rows = self._execute_query(query)
+        return [
+            ForeignKey(
+                column_name=row['column_name'],
+                referenced_table=row['referenced_table'],
+                referenced_column=row['referenced_column'],
+                constraint_name=row['constraint_name']
+            )
+            for row in rows
+        ]
+
+    def _get_index_details(self, schema_name: str, table_name: str) -> List[Index]:
+        query = f"""
+            SELECT index_name, is_unique, is_primary, sql
+            FROM duckdb_indexes()
+            WHERE table_name = '{table_name}'
+              AND schema_name = '{schema_name}'
+        """
+        rows = self._execute_query(query)
+        indexes = []
+        for row in rows:
+            col_names = []
+            if row.get('sql'):
+                match = re.search(r'\(([^)]+)\)', row['sql'])
+                if match:
+                    col_names = [c.strip() for c in match.group(1).split(',')]
+            indexes.append(Index(
+                name=row['index_name'],
+                column_names=col_names,
+                is_unique=bool(row['is_unique']),
+                is_primary=bool(row.get('is_primary', False)),
+                type=None
+            ))
+        return indexes

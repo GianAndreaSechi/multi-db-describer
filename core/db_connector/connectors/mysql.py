@@ -1,14 +1,18 @@
+import re
 import mysql.connector
-from typing import List, Dict, Any, Optional
+import mysql.connector.pooling
+from typing import Dict, Any, List, Optional
 from core.db_connector.interface import BaseConnector
 from core.db_connector.models import Instance, Schema, Table, Column, PrimaryKey, ForeignKey, Index, TableDescription
 from loguru import logger
-from ..cache_manager import CacheManager # Import CacheManager
+from ..cache_manager import CacheManager
 
 class MySQLConnector(BaseConnector):
     """
     A database connector for MySQL.
     """
+
+    _pools: Dict[str, mysql.connector.pooling.MySQLConnectionPool] = {}
 
     @staticmethod
     def get_type() -> str:
@@ -20,34 +24,40 @@ class MySQLConnector(BaseConnector):
         self.user = connection_params.get("user")
         self.password = connection_params.get("password")
         self.port = connection_params.get("port", 3306)
-        
+        pool_size = connection_params.get("pool_size", 5)
+
         if not (self.host and self.user and self.password is not None):
             logger.error("MySQL connector requires 'host', 'user', and 'password' in connection_params.")
             raise ValueError("MySQL connector requires 'host', 'user', and 'password' in connection_params.")
-        
-        # Test connection
-        try:
-            conn = mysql.connector.connect(
-                host=self.host,
-                user=self.user,
-                password=self.password,
-                port=self.port
-            )
-            conn.close()
-            logger.info(f"Successfully connected to MySQL at {self.host}:{self.port}")
-        except mysql.connector.Error as e:
-            logger.exception(f"Failed to connect to MySQL database at {self.host}:{self.port}")
-            raise ConnectionError(f"Failed to connect to MySQL database at {self.host}:{self.port}: {e}")
+
+        pool_key = f"{self.host}:{self.port}:{self.user}"
+        if pool_key not in MySQLConnector._pools:
+            try:
+                pool_name = re.sub(r'[^a-zA-Z0-9_]', '_', f"mysql_{self.host}_{self.port}")[:64]
+                MySQLConnector._pools[pool_key] = mysql.connector.pooling.MySQLConnectionPool(
+                    pool_name=pool_name,
+                    pool_size=pool_size,
+                    pool_reset_session=True,
+                    host=self.host,
+                    user=self.user,
+                    password=self.password,
+                    port=self.port
+                )
+                logger.info(f"Created connection pool for MySQL at {self.host}:{self.port} (size: {pool_size})")
+            except mysql.connector.Error as e:
+                logger.exception(f"Failed to create connection pool for MySQL at {self.host}:{self.port}")
+                raise ConnectionError(f"Failed to connect to MySQL database at {self.host}:{self.port}: {e}")
+        else:
+            logger.info(f"Reusing existing connection pool for MySQL at {self.host}:{self.port}")
+
+        self.pool = MySQLConnector._pools[pool_key]
 
     def _get_connection(self, database: Optional[str] = None):
-        """Helper to get a database connection."""
-        return mysql.connector.connect(
-            host=self.host,
-            user=self.user,
-            password=self.password,
-            port=self.port,
-            database=database
-        )
+        """Helper to get a connection from the pool."""
+        conn = self.pool.get_connection()
+        if database:
+            conn.database = database
+        return conn
 
     def _execute_query(self, query: str, params: tuple = (), database: Optional[str] = None) -> List[Dict[str, Any]]:
         """Helper to execute a query and return results as list of dicts."""
