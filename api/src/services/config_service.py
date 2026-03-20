@@ -30,9 +30,24 @@ class ConfigService:
             raise ValueError(f"ConfigService: Configuration '{config_name}' is missing 'connector_type' or 'connection_params'.")
         return {"connector_type": connector_type, "connection_params": connection_params}
 
+    def _get_hosts(self, config_name: str) -> List[str]:
+        details = self._get_connector_details(config_name)
+        return [h["host"] for h in details["connection_params"].get("hosts", [])]
+
+    def _get_connector_for_host(self, config_name: str, host: str):
+        details = self._get_connector_details(config_name)
+        host_params = next(
+            (h for h in details["connection_params"].get("hosts", []) if h["host"] == host),
+            None
+        )
+        if not host_params:
+            raise ValueError(f"Host '{host}' not found in config '{config_name}'")
+        return self.connector_manager.get_connector(details["connector_type"], host_params)
+
     def test_connection(self, config_name: str):
         logger.info(f"ConfigService: Attempting to test connection for config: {config_name}")
-        details = self._get_connector_details(config_name)
-        connector = self.connector_manager.get_connector(details["connector_type"], details["connection_params"])
-        logger.info(f"ConfigService: Successfully tested connection for config: {config_name}")
-        return {"message": f"Successfully connected to {config_name}."}
+        hosts = self._get_hosts(config_name)
+        for host in hosts:
+            self._get_connector_for_host(config_name, host)
+            logger.info(f"ConfigService: Successfully tested connection to {host} for config: {config_name}")
+        return {"message": f"Successfully connected to all hosts in {config_name}."}

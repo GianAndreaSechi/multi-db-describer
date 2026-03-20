@@ -14,22 +14,20 @@ def get_db_configurations():
         "mysql_dev": {
             "connector_type": "mysql",
             "connection_params": {
-                "host": os.getenv("MYSQL_HOST", "host.docker.internal"),
-                "user": os.getenv("MYSQL_USER", "root"),
-                "password": os.getenv("MYSQL_PASSWORD", ""),
-                "port": int(os.getenv("MYSQL_PORT", 3306))
-            }
-        },
-        "sqlite_local": {
-            "connector_type": "sqlite",
-            "connection_params": {
-                "database": os.getenv("SQLITE_DB_PATH", "/app/data/test.db")
-            }
-        },
-        "duckdb_local": {
-            "connector_type": "duckdb",
-            "connection_params": {
-                "database": os.getenv("DUCKDB_PATH", "/app/data/duck.db")
+                "hosts": [
+                    {
+                        "host": os.getenv("MYSQL_HOST_1", "host.docker.internal"),
+                        "user": os.getenv("MYSQL_USER_1", "root"),
+                        "password": os.getenv("MYSQL_PASSWORD_1", ""),
+                        "port": int(os.getenv("MYSQL_PORT_1", 3306))
+                    },
+                    {
+                        "host": os.getenv("MYSQL_HOST_2", "host.docker.internal"),
+                        "user": os.getenv("MYSQL_USER_2", "root"),
+                        "password": os.getenv("MYSQL_PASSWORD_2", ""),
+                        "port": int(os.getenv("MYSQL_PORT_2", 3306))
+                    }
+                ]
             }
         }
     }
