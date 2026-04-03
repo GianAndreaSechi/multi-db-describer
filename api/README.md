@@ -1,76 +1,71 @@
-# Multi-DB Connector API
+# API
 
-## Introduction
+FastAPI service exposing database introspection over HTTP. Provides synchronous point-in-time endpoints and async scan job enqueueing. Depends only on **core**.
 
-This API serves as a versatile connector for various database systems, providing a unified interface for database introspection. It allows users to connect to different database types (e.g., MySQL, SQLite, DuckDB) and perform operations such as listing instances, schemas, tables, and describing table structures. The API is designed to be extensible, allowing for easy integration of new database connectors.
+---
 
-## Technical Details
+## Endpoints
 
-The API is built using **FastAPI**, a modern, fast (high-performance) web framework for building APIs with Python 3.7+ based on standard Python type hints. It leverages **Pydantic** for data validation and serialization, ensuring robust and type-safe data handling.
+### Synchronous — all parameters required (no implicit bulk operations)
 
-Key features include:
-- **Database Abstraction**: Connects to multiple database types through a common interface.
-- **Introspection Capabilities**: Provides endpoints to explore database metadata (instances, schemas, tables, column details).
-- **Configurable Connections**: Database connection parameters are managed through configurations, allowing for flexible setup.
-- **Logging**: Utilizes `loguru` for comprehensive and easy-to-read logging.
-- **Custom Response Formats**: Supports both JSON and TOON (Tree-Oriented Object Notation) response formats, selectable via the `Accept` HTTP header.
-- **Caching with Redis**: Implements a caching layer using Redis to improve performance for frequently accessed database metadata.
+| Method | Path | Required body |
+|---|---|---|
+| `GET` | `/configurations` | — |
+| `POST` | `/connect` | `config_name` |
+| `POST` | `/instances` | `config_name` |
+| `POST` | `/schemas` | `config_name`, `instance_name` |
+| `POST` | `/tables` | `config_name`, `instance_name`, `schema_name` |
+| `POST` | `/describe` | `config_name`, `instance_name`, `schema_name`, `table_name` |
 
-### Caching with Redis
+All endpoints accept the optional header `no-cache: true` to bypass Redis caching.  
+Response format can be switched to TOON via `Accept: application/toon`.
 
-To enhance performance, the API utilizes Redis for caching database introspection results.
+### Async Scan
 
-*   **Cache Key Prefix**: All cache keys are prefixed with `multi-db-connector` (configurable via `CACHE_KEY_PREFIX` environment variable) to prevent collisions in a shared Redis instance.
-*   **Time-to-Live (TTL)**: Cached data has a default TTL of 1 day (configurable via `REDIS_TTL_SECONDS` environment variable).
-*   **Bypassing Cache**: You can bypass the cache for any request by including the `no-cache: true` HTTP header in your request.
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/scan` | Enqueue a scan job — returns `job_id` immediately (HTTP 202) |
+| `GET` | `/scan/{job_id}` | Job status; add `?include_results=true` for full `TableDescription` list |
+| `GET` | `/scans?limit=50` | List recent jobs (newest first, no result payloads) |
 
-## Docker
+Scan scope parameters (all optional — omit to scan everything):
+```json
+{ "config_name": "mysql_dev", "instance_name": "host", "schema_name": "mydb" }
+```
 
-To run the API using Docker, follow these steps:
+---
 
-0. **Using docker-compose (Recommended for API with Redis):**
-    A `docker-compose.yml` file is provided in the `api/` directory to easily set up both the API and a Redis server.
+## Environment Variables
 
-    Navigate to the `api/` directory and run:
-    ```bash
-    cd api/
-    docker-compose build
-    docker-compose up
-    ```
+Copy `.env.example` to `.env`.
 
-1.  **Build the Docker image (API only, without Redis orchestration):**
-    ```bash
-    docker build -t multi-db-api .
-    ```
+| Variable | Default | Description |
+|---|---|---|
+| `REDIS_HOST` | `localhost` | Must match Worker's Redis |
+| `REDIS_PORT` | `6379` | |
+| `REDIS_DB` | `0` | |
+| `REDIS_TTL_SECONDS` | `86400` | Introspection cache TTL |
+| `CACHE_KEY_PREFIX` | `multi-db-connector` | Must match Worker's prefix |
 
-2.  **Run the Docker container (API only):**
-    If you are running Redis separately (e.g., locally or in another container), you can run the API container and link it to your Redis instance using environment variables.
+DB connection vars — see [root README](../README.md#db-configuration-activation).
 
-    ```bash
-    docker run -d --name multi-db-api -p 8000:8000 \
-      -e REDIS_HOST=your_redis_host \
-      -e REDIS_PORT=your_redis_port \
-      -e REDIS_DB=your_redis_db \
-      -e REDIS_TTL_SECONDS=86400 \
-      -e CACHE_KEY_PREFIX=multi-db-connector \
-      multi-db-api
-    ```
-    Replace `your_redis_host`, `your_redis_port`, `your_redis_db` with your Redis connection details.
+---
 
-3.  **Access the API:**
-    The API will be available at `http://localhost:8000`. You can access the interactive API documentation (Swagger UI) at `http://localhost:8000/docs`.
+## Running
 
-4.  **Stop the Docker container:**
-    ```bash
-    docker stop multi-db-api
-    ```
+### Docker Compose
 
-5.  **Remove the Docker container:**
-    ```bash
-    docker rm multi-db-api
-    ```
+```bash
+# Start shared Redis first
+docker compose -f ../docker-compose.infra.yml up -d
 
-6.  **Remove the Docker image:
-    ```bash
-    docker rmi multi-db-connector-api
-    ```
+# Start API
+docker compose up -d
+```
+
+### Local
+
+```bash
+pip install -r requirements.txt
+uvicorn api.src.main:app --host 0.0.0.0 --port 8000 --reload
+```

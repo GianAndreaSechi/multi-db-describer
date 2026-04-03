@@ -3,7 +3,7 @@ from loguru import logger
 
 from core.db_connector.manager import ConnectorManager
 from core.db_connector.models import Instance, Schema, Table, TableDescription
-from api.src.services.config_service import ConfigService
+from core.db_connector.config_service import ConfigService
 
 class DescribeTableService:
     def __init__(self, config_service: ConfigService, connector_manager: ConnectorManager):
