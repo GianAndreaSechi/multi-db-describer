@@ -21,6 +21,7 @@ class ScanExecutorService:
         config_name: Optional[str],
         instance_name: Optional[str],
         schema_name: Optional[str],
+        no_cache: bool = False,
     ) -> int:
         """
         Scans tables according to the given scope, stores each TableDescription
@@ -45,22 +46,27 @@ class ScanExecutorService:
                     schemas = (
                         [Schema(name=schema_name)]
                         if schema_name
-                        else connector.list_schemas(instance_name=host)
+                        else connector.list_schemas(instance_name=host, no_cache=no_cache)
                     )
 
                     for sch in schemas:
-                        tables = connector.list_tables(instance_name=host, schema_name=sch.name)
+                        tables = connector.list_tables(
+                            instance_name=host,
+                            schema_name=sch.name,
+                            no_cache=no_cache
+                        )
 
                         for tbl in tables:
                             logger.info(
                                 f"ScanExecutorService [{job_id}]: "
-                                f"{c_name}/{host}/{sch.name}/{tbl.name}"
+                                f"{c_name}/{host}/{sch.name}/{tbl.name} (no_cache={no_cache})"
                             )
                             try:
                                 desc = connector.describe_table(
                                     instance_name=host,
                                     schema_name=sch.name,
                                     table_name=tbl.name,
+                                    no_cache=no_cache,
                                 )
                                 self.job_store.append_result(job_id, desc.model_dump())
                                 count += 1

@@ -112,15 +112,16 @@ class ScanWorker:
         config_name = data.get("config_name") or None
         instance_name = data.get("instance_name") or None
         schema_name = data.get("schema_name") or None
+        no_cache = data.get("no_cache") == "true"
 
         logger.info(
             f"ScanWorker: processing job {job_id} "
-            f"[config={config_name}, instance={instance_name}, schema={schema_name}]"
+            f"[config={config_name}, instance={instance_name}, schema={schema_name}, no_cache={no_cache}]"
         )
         self.job_store.mark_running(job_id)
 
         try:
-            count = self.executor.execute(job_id, config_name, instance_name, schema_name)
+            count = self.executor.execute(job_id, config_name, instance_name, schema_name, no_cache)
             self.job_store.mark_completed(job_id, count)
             logger.info(f"ScanWorker: job {job_id} completed — {count} tables described")
         except Exception as e:
