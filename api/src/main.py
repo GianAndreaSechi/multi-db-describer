@@ -200,7 +200,7 @@ async def describe_table_route(req: DescribeTableRequest, http_request: Request,
 # ---------------------------------------------------------------------------
 
 @app.post("/scan", status_code=202)
-async def enqueue_scan(req: ScanRequest, http_request: Request):
+async def enqueue_scan(req: ScanRequest, http_request: Request, no_cache: bool = Depends(get_no_cache_header)):
     """
     Enqueue an async scan job.
     The worker will describe all tables matching the given scope and store results.
@@ -213,10 +213,10 @@ async def enqueue_scan(req: ScanRequest, http_request: Request):
     """
     logger.info(
         f"API: Enqueuing scan job config={req.config_name}, "
-        f"instance={req.instance_name}, schema={req.schema_name}"
+        f"instance={req.instance_name}, schema={req.schema_name}, no_cache={no_cache}"
     )
     try:
-        job = scan_service.enqueue_scan(req.config_name, req.instance_name, req.schema_name)
+        job = scan_service.enqueue_scan(req.config_name, req.instance_name, req.schema_name, no_cache)
         return api_response(http_request, "Scan job enqueued successfully.", job.model_dump(mode="json"))
     except ConnectionError as e:
         logger.error(f"API: Scan enqueue failed — Redis unreachable: {e}")
