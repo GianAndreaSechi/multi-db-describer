@@ -23,15 +23,26 @@ class Index(BaseModel):
     is_primary: bool # True if this index is also the primary key
     type: Optional[str] = None # e.g., 'BTREE', 'HASH'
 
+class Partition(BaseModel):
+    """Represents a partition key column of a table."""
+    column_name: str
+    data_type: str
+    comment: Optional[str] = None
+
 class TableDescription(BaseModel):
     """
     A comprehensive description of a database table, including columns,
-    primary keys, foreign keys, and other indexes.
+    primary keys, foreign keys, indexes, and partition keys.
+
+    sort_key is used by key-value stores (e.g. DynamoDB) where a range/sort key
+    coexists with the partition key to form the composite primary key.
     """
     instance_name: str
     schema_name: str
     table_name: str
     columns: List[Column]
     primary_key: Optional[PrimaryKey] = None
+    sort_key: Optional[str] = None
     foreign_keys: List[ForeignKey] = []
     indexes: List[Index] = []
+    partitions: List[Partition] = []
