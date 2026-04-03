@@ -10,7 +10,7 @@ from core.db_connector.models import (
     TableDescription
 )
 from core.db_connector.cache_manager import CacheManager
-from api.src.services.config_service import ConfigService
+from core.db_connector.config_service import ConfigService
 from api.src.services.instance_service import InstanceService
 from api.src.services.schema_service import SchemaService
 from api.src.services.table_service import TableService
@@ -21,12 +21,15 @@ from api.src.models.requests.instance_request import InstanceRequest
 from api.src.models.requests.schema_request import SchemaRequest
 from api.src.models.requests.table_request import TableRequest
 from api.src.models.requests.describe_table_request import DescribeTableRequest
+from api.src.models.requests.scan_request import ScanRequest
 from api.src.services.response_service import api_response
+from api.src.services.scan_service import ScanService
+from core.db_connector.job_store import JobStore
 
 app = FastAPI(
     title="Multi DB Describer API",
     description="API for connecting to various databases and performing introspection.",
-    version="0.1.0",
+    version="0.2.0",
 )
 
 # Initialize CacheManager
@@ -44,6 +47,14 @@ instance_service = InstanceService(config_service, connector_manager)
 schema_service = SchemaService(config_service, connector_manager)
 table_service = TableService(config_service, connector_manager)
 describe_table_service = DescribeTableService(config_service, connector_manager)
+
+job_store = JobStore(
+    host=os.getenv("REDIS_HOST", "localhost"),
+    port=int(os.getenv("REDIS_PORT", 6379)),
+    db=int(os.getenv("REDIS_DB", 0)),
+    prefix=os.getenv("CACHE_KEY_PREFIX", "multi-db-connector"),
+)
+scan_service = ScanService(job_store)
 
 # Helper to extract no_cache header
 def get_no_cache_header(no_cache: Optional[str] = Header(None)) -> bool:
@@ -98,7 +109,7 @@ async def list_instances_route(req: InstanceRequest, http_request: Request, no_c
     """
     logger.info(f"API: Listing instances for config names: {req.config_names if req.config_names else 'all available'}")
     try:
-        data = instance_service.list_instances(req.config_names, no_cache=no_cache) # Pass no_cache
+        data = instance_service.list_instances([req.config_name], no_cache=no_cache) # Pass no_cache
         return api_response(http_request, "Instances retrieved successfully.", data)
     except ValueError as e:
         logger.error(f"API: Listing instances failed: {e}")
@@ -181,6 +192,77 @@ async def describe_table_route(req: DescribeTableRequest, http_request: Request,
         raise HTTPException(status_code=500, detail=f"Failed to connect: {e}")
     except Exception as e:
         logger.exception(f"API: An unexpected error occurred while describing table for config: {req.config_name}, instance: {req.instance_name}, schema: {req.schema_name}, table: {req.table_name}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Async scan endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/scan", status_code=202)
+async def enqueue_scan(req: ScanRequest, http_request: Request):
+    """
+    Enqueue an async scan job.
+    The worker will describe all tables matching the given scope and store results.
+    Returns a job_id that can be polled via GET /scan/{job_id}.
+
+    Scope resolution (all None = scan everything):
+    - config_name=None   → all configurations
+    - instance_name=None → all instances within each config
+    - schema_name=None   → all schemas within each instance
+    """
+    logger.info(
+        f"API: Enqueuing scan job config={req.config_name}, "
+        f"instance={req.instance_name}, schema={req.schema_name}"
+    )
+    try:
+        job = scan_service.enqueue_scan(req.config_name, req.instance_name, req.schema_name)
+        return api_response(http_request, "Scan job enqueued successfully.", job.model_dump(mode="json"))
+    except ConnectionError as e:
+        logger.error(f"API: Scan enqueue failed — Redis unreachable: {e}")
+        raise HTTPException(status_code=503, detail=f"Queue unavailable: {e}")
+    except Exception as e:
+        logger.exception("API: Unexpected error while enqueuing scan job")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+
+
+@app.get("/scan/{job_id}")
+async def get_scan_job(job_id: str, http_request: Request, include_results: bool = False):
+    """
+    Get the status (and optionally results) of a scan job.
+    Add ?include_results=true to retrieve the full list of TableDescriptions.
+    """
+    try:
+        job = scan_service.get_job(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail=f"Scan job '{job_id}' not found.")
+
+        data = job.model_dump(mode="json")
+        if include_results:
+            data["results"] = scan_service.get_job_results(job_id)
+
+        return api_response(http_request, "Scan job retrieved successfully.", data)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"API: Unexpected error retrieving scan job {job_id}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+
+
+@app.get("/scans")
+async def list_scan_jobs(http_request: Request, limit: int = 50):
+    """
+    List recent scan jobs (newest first, no results payload).
+    """
+    try:
+        jobs = scan_service.list_jobs(limit=limit)
+        return api_response(
+            http_request,
+            "Scan jobs retrieved successfully.",
+            [j.model_dump(mode="json") for j in jobs],
+        )
+    except Exception as e:
+        logger.exception("API: Unexpected error listing scan jobs")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
 
