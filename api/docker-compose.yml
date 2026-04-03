@@ -1,33 +1,28 @@
 version: '3.8'
 
-services:
-  redis:
-    image: redis:6-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: always # Ensure Redis restarts if it crashes
+# Requires shared infra to be running:
+#   docker compose -f ../docker-compose.infra.yml up -d
 
+services:
   multi-db-api:
     build:
       context: ..
-      dockerfile: api/Dockerfile # Path is still correct relative to context
+      dockerfile: api/Dockerfile
     ports:
       - "8000:8000"
     environment:
-      REDIS_HOST: redis # This should match the service name of your Redis container
+      REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: 0
       REDIS_TTL_SECONDS: 86400
-    depends_on:
-      - redis
+      CACHE_KEY_PREFIX: multi-db-connector
+    networks:
+      - multi-db-net
     volumes:
-      # Mount API source code from parent directory (project root)
       - ../api:/app/api
-      # Mount Core source code from parent directory (project root)
       - ../core:/app/core
-    restart: always # Ensure API restarts if it crashes
+    restart: always
 
-volumes:
-  redis_data:
+networks:
+  multi-db-net:
+    external: true
