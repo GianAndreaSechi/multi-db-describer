@@ -34,16 +34,16 @@ def register_tools(mcp):
         """
         List instances for specific configurations by calling the API service.
         """
-        logger.info(f"MCP: Listing instances for configs: {request.config_names} via API service.")
+        logger.info(f"MCP: Listing instances for config '{request.config_name}' via API service.")
         response_format = TOON_RESPONSE_FORMAT
         api_response = await api_client.post("/instances", payload=request.model_dump(), no_cache=no_cache, response_format=response_format)
         if "error" in api_response:
             return GenericResponse(message=api_response["error"])
-        
+
         if response_format == TOON_RESPONSE_FORMAT:
             return ToonResponse(toon=toons.dumps(api_response.get("data")))
 
-        return GenericResponse(message=f"Instances for {request.config_names} retrieved successfully from API.", data=api_response.get("data"))
+        return GenericResponse(message=f"Instances for '{request.config_name}' retrieved successfully from API.", data=api_response.get("data"))
 
     @mcp.tool()
     async def list_schemas(request: SchemaRequest, no_cache: Optional[bool] = False) -> UnifiedResponse:
