@@ -1,8 +1,8 @@
-from typing import Optional
 from pydantic import BaseModel
 
+
 class DescribeTableRequest(BaseModel):
-    config_name: Optional[str] = None
-    instance_name: Optional[str] = None
-    schema_name: Optional[str] = None
-    table_name: Optional[str] = None
+    config_name: str
+    instance_name: str
+    schema_name: str
+    table_name: str
