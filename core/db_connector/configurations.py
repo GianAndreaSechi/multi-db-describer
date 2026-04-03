@@ -33,19 +33,19 @@ def get_db_configurations() -> dict:
     # ── MySQL ──────────────────────────────────────────────────────────────────
     # Each host is added independently; the config is enabled if at least one is set.
     mysql_hosts = []
-    if _env("MYSQL_DBPUBLISHERS_HOST"):
+    if _env("MYSQL_DB1_HOST"):
         mysql_hosts.append({
-            "host":     _env("MYSQL_DBPUBLISHERS_HOST"),
-            "user":     os.getenv("MYSQL_DBPUBLISHERS_USER", "root"),
-            "password": os.getenv("MYSQL_DBPUBLISHERS_PASSWORD", ""),
-            "port":     int(os.getenv("MYSQL_DBPUBLISHERS_PORT", 3306)),
+            "host":     _env("MYSQL_DB1_HOST"),
+            "user":     os.getenv("MYSQL_DB1_USER", "root"),
+            "password": os.getenv("MYSQL_DB1_PASSWORD", ""),
+            "port":     int(os.getenv("MYSQL_DB1_PORT", 3306)),
         })
-    if _env("MYSQL_DBCATALOGUE_HOST"):
+    if _env("MYSQL_DB2_HOST"):
         mysql_hosts.append({
-            "host":     _env("MYSQL_DBCATALOGUE_HOST"),
-            "user":     os.getenv("MYSQL_DBCATALOGUE_USER", "root"),
-            "password": os.getenv("MYSQL_DBCATALOGUE_PASSWORD", ""),
-            "port":     int(os.getenv("MYSQL_DBCATALOGUE_PORT", 3306)),
+            "host":     _env("MYSQL_DB2_HOST"),
+            "user":     os.getenv("MYSQL_DB2_USER", "root"),
+            "password": os.getenv("MYSQL_DB2_PASSWORD", ""),
+            "port":     int(os.getenv("MYSQL_DB2_PORT", 3306)),
         })
     if mysql_hosts:
         configs["mysql_dev"] = {
