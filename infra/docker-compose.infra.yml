@@ -1,0 +1,25 @@
+version: '3.8'
+
+# Shared infrastructure — start this first:
+#   docker compose -f docker-compose.infra.yml up -d
+#
+# API, Worker and MCP docker-compose files reference the
+# 'multi-db-net' network as external and use REDIS_HOST=redis.
+
+services:
+  redis:
+    image: redis:6-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - multi-db-net
+    restart: always
+
+networks:
+  multi-db-net:
+    name: multi-db-net
+
+volumes:
+  redis_data:
