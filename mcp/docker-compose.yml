@@ -1,14 +1,9 @@
 version: '3.8'
 
-services:
-  redis:
-    image: redis:6-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: always
+# Requires shared infra to be running:
+#   docker compose -f ../docker-compose.infra.yml up -d
 
+services:
   multi-db-api:
     build:
       context: ..
@@ -21,8 +16,8 @@ services:
       REDIS_DB: 0
       REDIS_TTL_SECONDS: 86400
       CACHE_KEY_PREFIX: multi-db-connector
-    depends_on:
-      - redis
+    networks:
+      - multi-db-net
     volumes:
       - ../api:/app/api
       - ../core:/app/core
@@ -33,14 +28,17 @@ services:
       context: ..
       dockerfile: mcp/Dockerfile
     ports:
-      - "8001:8000" # MCP will run on port 8001 on the host
+      - "8001:8000"
     environment:
-      API_BASE_URL: http://multi-db-api:8000 # MCP connects to the API service
-   # depends_on:
-   #   - multi-db-api # MCP depends on the API service
+      API_BASE_URL: http://multi-db-api:8000
+    depends_on:
+      - multi-db-api
+    networks:
+      - multi-db-net
     volumes:
       - ../mcp:/app/mcp
     restart: always
 
-volumes:
-  redis_data:
+networks:
+  multi-db-net:
+    external: true

@@ -10,11 +10,13 @@ from .constants import TOON_RESPONSE_FORMAT
 
 from .tools.healtz_tools import register_tools as register_healthz_tools
 from .tools.database_tools import register_tools as register_database_tools
+from .tools.scan_tools import register_tools as register_scan_tools
 
 mcp = FastMCP("Multi-DB Connector Control Plane (MCP)")
 
 register_healthz_tools(mcp)
 register_database_tools(mcp)
+register_scan_tools(mcp)
 
 
 if __name__ == "__main__":
