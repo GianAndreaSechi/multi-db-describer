@@ -12,7 +12,7 @@ def register_tools(mcp):
     """Register async scan tools for the MCP Server."""
 
     @mcp.tool()
-    async def enqueue_scan(request: ScanRequest) -> UnifiedResponse:
+    async def enqueue_scan(request: ScanRequest, no_cache: Optional[bool] = False) -> UnifiedResponse:
         """
         Enqueue an async scan job.
         The worker will describe all tables matching the given scope and store results in Redis.
@@ -22,14 +22,18 @@ def register_tools(mcp):
           - config_name:   limit to a specific DB configuration
           - instance_name: limit to a specific instance within the config
           - schema_name:   limit to a specific schema within the instance
+        
+        Cache:
+          - no_cache: if True, bypasses existing cache and forces a fresh scan.
         """
         logger.info(
             f"MCP: Enqueueing scan job "
-            f"[config={request.config_name}, instance={request.instance_name}, schema={request.schema_name}]"
+            f"[config={request.config_name}, instance={request.instance_name}, schema={request.schema_name}, no_cache={no_cache}]"
         )
         api_response = await api_client.post(
             "/scan",
             payload=request.model_dump(),
+            no_cache=no_cache,
             response_format=JSON_RESPONSE_FORMAT,
         )
         if "error" in api_response:
