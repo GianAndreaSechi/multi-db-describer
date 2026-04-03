@@ -59,6 +59,7 @@ class JobStore:
             "config_name":   job.scope.config_name or "",
             "instance_name": job.scope.instance_name or "",
             "schema_name":   job.scope.schema_name or "",
+            "no_cache":      "true" if job.scope.no_cache else "false",
             "created_at":    _str(job.created_at),
             "started_at":    _str(job.started_at),
             "completed_at":  _str(job.completed_at),
@@ -79,6 +80,7 @@ class JobStore:
                 config_name=fields.get("config_name") or None,
                 instance_name=fields.get("instance_name") or None,
                 schema_name=fields.get("schema_name") or None,
+                no_cache=fields.get("no_cache") == "true",
             ),
             created_at=_dt(fields.get("created_at", "")),
             started_at=_dt(fields.get("started_at", "")),
@@ -142,6 +144,7 @@ class JobStore:
             "config_name":   fields["config_name"],
             "instance_name": fields["instance_name"],
             "schema_name":   fields["schema_name"],
+            "no_cache":      fields["no_cache"],
         })
         pipe.execute()
 

@@ -13,11 +13,13 @@ class ScanService:
         config_name: Optional[str],
         instance_name: Optional[str],
         schema_name: Optional[str],
+        no_cache: bool = False,
     ) -> ScanJob:
         scope = ScanScope(
             config_name=config_name,
             instance_name=instance_name,
             schema_name=schema_name,
+            no_cache=no_cache,
         )
         return self.job_store.enqueue(scope)
 

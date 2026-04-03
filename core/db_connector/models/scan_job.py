@@ -15,6 +15,7 @@ class ScanScope(BaseModel):
     config_name: Optional[str] = None    # None = all configs
     instance_name: Optional[str] = None  # None = all instances
     schema_name: Optional[str] = None    # None = all schemas
+    no_cache: bool = False               # If True, bypass cache during scan
 
 
 class ScanJob(BaseModel):
