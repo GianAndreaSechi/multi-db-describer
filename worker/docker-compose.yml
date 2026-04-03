@@ -1,0 +1,28 @@
+version: '3.8'
+
+# Requires shared infra to be running:
+#   docker compose -f ../docker-compose.infra.yml up -d
+
+services:
+  multi-db-worker:
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_TTL_SECONDS: 86400
+      CACHE_KEY_PREFIX: multi-db-connector
+      SCAN_RESULTS_TTL_SECONDS: 604800   # 7 days
+      WORKER_STREAM_BLOCK_MS: 5000
+    networks:
+      - multi-db-net
+    volumes:
+      - ../core:/app/core
+      - ../worker:/app/worker
+    restart: always
+
+networks:
+  multi-db-net:
+    external: true
