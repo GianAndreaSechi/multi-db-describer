@@ -11,5 +11,9 @@ setup(
         'pytest',
         'duckdb',
         'loguru',
+        'boto3',
+        'pymongo',
+        'psycopg2-binary',
+        'trino',
     ],
 )
