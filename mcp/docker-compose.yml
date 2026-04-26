@@ -1,7 +1,7 @@
 version: '3.8'
 
 # Requires shared infra to be running:
-#   docker compose -f ../docker-compose.infra.yml up -d
+#   docker compose -f ../infra/docker-compose.infra.yml up -d
 
 services:
   multi-db-api:
