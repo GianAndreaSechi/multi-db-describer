@@ -16,14 +16,14 @@ The API writes scan jobs to a Redis Stream. The Worker reads from the same strea
 
 ```bash
 # From the project root
-docker compose -f docker-compose.infra.yml up -d
+docker compose -f infra/docker-compose.infra.yml up -d
 ```
 
 This creates a Redis container and a Docker network `multi-db-net`. All other `docker-compose.yml` files reference this network as `external: true` and set `REDIS_HOST=redis`.
 
 To verify:
 ```bash
-docker compose -f docker-compose.infra.yml ps
+docker compose -f infra/docker-compose.infra.yml ps
 redis-cli -h localhost ping   # PONG
 ```
 
