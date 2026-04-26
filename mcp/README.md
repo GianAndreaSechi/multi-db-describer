@@ -52,7 +52,7 @@ Copy `.env.example` to `.env`.
 
 ```bash
 # Starts Redis + API + MCP
-docker compose -f ../docker-compose.infra.yml up -d
+docker compose -f ../infra/docker-compose.infra.yml up -d
 docker compose up -d
 ```
 
