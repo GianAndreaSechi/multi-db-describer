@@ -2,6 +2,7 @@ from typing import Dict, Any, List, Optional
 from loguru import logger
 
 from core.db_connector.manager import ConnectorManager
+from core.db_connector.models import Instance
 from core.db_connector.configurations import DB_CONFIGURATIONS
 
 
@@ -32,6 +33,11 @@ class ConfigService:
         return {"connector_type": connector_type, "connection_params": connection_params}
 
     def _get_hosts(self, config_name: str) -> List[str]:
+        """Return explicitly configured connection hosts, when present.
+
+        Some connectors (Athena, DynamoDB and Trino) discover their instances
+        remotely, so their configuration has no ``hosts`` collection.
+        """
         details = self._get_connector_details(config_name)
         return [h["host"] for h in details["connection_params"].get("hosts", [])]
 
@@ -41,14 +47,45 @@ class ConfigService:
             (h for h in details["connection_params"].get("hosts", []) if h["host"] == host),
             None,
         )
-        if not host_params:
-            raise ValueError(f"Host '{host}' not found in config '{config_name}'")
-        return self.connector_manager.get_connector(details["connector_type"], host_params)
+        if host_params:
+            return self.connector_manager.get_connector(details["connector_type"], host_params)
+
+        # Flat connection parameters identify one connection, while ``host`` is
+        # an instance/catalog/region discovered through that connection.
+        if not details["connection_params"].get("hosts"):
+            return self.connector_manager.get_connector(
+                details["connector_type"], details["connection_params"]
+            )
+        raise ValueError(f"Host '{host}' not found in config '{config_name}'")
+
+    def list_instances(self, config_name: str, no_cache: bool = False) -> List[Instance]:
+        """List instances for both multi-host and flat connector configurations."""
+        configured_hosts = self._get_hosts(config_name)
+        if configured_hosts:
+            instances: List[Instance] = []
+            for host in configured_hosts:
+                connector = self._get_connector_for_host(config_name, host)
+                instances.extend(connector.list_instances(no_cache=no_cache))
+            return instances
+
+        details = self._get_connector_details(config_name)
+        connector = self.connector_manager.get_connector(
+            details["connector_type"], details["connection_params"]
+        )
+        return connector.list_instances(no_cache=no_cache)
+
+    def resolve_instance_names(
+        self, config_name: str, instance_name: Optional[str] = None, no_cache: bool = False
+    ) -> List[str]:
+        if instance_name:
+            return [instance_name]
+        return [instance.name for instance in self.list_instances(config_name, no_cache)]
 
     def test_connection(self, config_name: str):
         logger.info(f"ConfigService: Attempting to test connection for config: {config_name}")
-        hosts = self._get_hosts(config_name)
-        for host in hosts:
-            self._get_connector_for_host(config_name, host)
-            logger.info(f"ConfigService: Successfully tested connection to {host} for config: {config_name}")
+        for instance in self.list_instances(config_name, no_cache=True):
+            logger.info(
+                f"ConfigService: Successfully tested connection to {instance.name} "
+                f"for config: {config_name}"
+            )
         return {"message": f"Successfully connected to all hosts in {config_name}."}
