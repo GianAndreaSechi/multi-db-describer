@@ -25,7 +25,7 @@ API  ──xadd──►  Redis Stream (scan:queue)
 
 1. The API enqueues a job to the Redis Stream (`{prefix}:scan:queue`) and returns a `job_id` (HTTP 202 Accepted).
 2. The Worker reads the job message via `xreadgroup`, calls `mark_running`, and resolves active targets using `resolve_instance_names` (supporting both multi-host and flat connectors like Athena/DynamoDB).
-3. Each scanned `TableDescription` is appended to the Redis results list (`{prefix}:scan:results:{job_id}`) as it completes, extending key TTL.
+3. Each scanned `TableDescription` is appended to the Redis results list (`{prefix}:scan:results:{job_id}`). If `generate_ai_docs=true`, `AIDocumentationService` generates an LLM summary via LiteLLM; if `save_metadata=true`, metadata is persisted to disk/store.
 4. On finish, the Worker updates job status via `mark_completed(count)` or `mark_failed(error)`.
 5. The API's `GET /scan/{job_id}?include_results=true` reads results directly from Redis.
 
@@ -48,6 +48,9 @@ Copy `.env.example` to `.env`.
 | `SCAN_RESULTS_TTL_SECONDS` | `604800` | Scan result retention in Redis (7 days) |
 | `WORKER_STREAM_BLOCK_MS` | `5000` | Stream read timeout per poll cycle |
 | `DB_CONFIG_FILE` | *(none)* | Explicit path to `.env` file for Docker container |
+| `LITELLM_MODEL` | `gpt-4o-mini` | LLM model for AI doc generation (via LiteLLM) |
+| `STORAGE_METADATA_DIR` | `storage/metadata` | Directory for JSON metadata files |
+
 
 DB connection vars — see [root README](../README.md#db-configuration--activation).
 
