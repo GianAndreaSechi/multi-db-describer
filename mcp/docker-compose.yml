@@ -17,11 +17,13 @@ services:
       REDIS_TTL_SECONDS: 86400
       CACHE_KEY_PREFIX: multi-db-connector
       DB_CONFIG_FILE: /app/api/.env
+      STORAGE_METADATA_DIR: /app/storage/metadata
     networks:
       - multi-db-net
     volumes:
       - ../api:/app/api
       - ../core:/app/core
+      - ../storage:/app/storage
     restart: always
 
   multi-db-mcp:
@@ -44,6 +46,9 @@ services:
     build:
       context: ..
       dockerfile: worker/Dockerfile
+    # Supplies optional LiteLLM credentials without duplicating them in api/.env.
+    env_file:
+      - ../worker/.env
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -52,6 +57,7 @@ services:
       CACHE_KEY_PREFIX: multi-db-connector
       SCAN_RESULTS_TTL_SECONDS: 604800
       WORKER_STREAM_BLOCK_MS: 5000
+      STORAGE_METADATA_DIR: /app/storage/metadata
       # The worker must receive exactly the same DB configuration as the API.
       DB_CONFIG_FILE: /app/api/.env
     networks:
@@ -59,6 +65,8 @@ services:
     volumes:
       - ../core:/app/core
       - ../worker:/app/worker
+      - ../api:/app/api:ro
+      - ../storage:/app/storage
     restart: always
 
 networks:
