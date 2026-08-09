@@ -2,7 +2,10 @@ import os
 from dotenv import load_dotenv
 from loguru import logger
 
-load_dotenv()
+# Containers mount each component's configuration in a different directory.
+# DB_CONFIG_FILE makes that location explicit while preserving normal local
+# dotenv discovery when it is not set.
+load_dotenv(dotenv_path=os.getenv("DB_CONFIG_FILE") or None)
 
 
 def _env(key: str) -> str | None:

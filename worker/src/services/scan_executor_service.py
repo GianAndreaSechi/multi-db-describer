@@ -35,10 +35,7 @@ class ScanExecutorService:
 
         for c_name in config_names:
             try:
-                hosts = (
-                    [instance_name] if instance_name
-                    else self.config_service._get_hosts(c_name)
-                )
+                hosts = self.config_service.resolve_instance_names(c_name, instance_name, no_cache)
 
                 for host in hosts:
                     connector = self.config_service._get_connector_for_host(c_name, host)

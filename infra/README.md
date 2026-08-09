@@ -1,42 +1,45 @@
 # Infra — Shared Infrastructure
 
-Provides the shared Redis instance used by both the **API** (cache + scan job queue) and the **Worker** (job queue consumer + result storage).
+Provides the shared Redis instance and Docker network (`multi-db-net`) used by the **API** (introspection cache + job producer), the **Worker** (job consumer + result writer), and the **MCP Server**.
 
-> Redis must be started **before** the API and the Worker.
-
----
-
-## Why a Shared Redis
-
-The API writes scan jobs to a Redis Stream. The Worker reads from the same stream. If they use separate Redis instances they can never communicate. This component ensures a single, shared Redis is available to all services.
+> ⚠️ Redis must be started **before** launching the API, Worker, or MCP services.
 
 ---
 
-## Docker Compose
+## Why a Shared Infrastructure
+
+The API writes scan jobs to a Redis Stream (`scan:queue`), while the Worker reads from that stream. Placing Redis and the services in a shared Docker network (`multi-db-net`) guarantees seamless service discovery (`REDIS_HOST=redis`) across containers.
+
+---
+
+## Docker Compose Setup
 
 ```bash
 # From the project root
 docker compose -f infra/docker-compose.infra.yml up -d
 ```
 
-This creates a Redis container and a Docker network `multi-db-net`. All other `docker-compose.yml` files reference this network as `external: true` and set `REDIS_HOST=redis`.
+This starts:
+- Redis container listening on port `6379`.
+- Docker bridge network `multi-db-net`. All other component `docker-compose.yml` files declare `external: true` for this network.
 
-To verify:
+To verify status:
 ```bash
 docker compose -f infra/docker-compose.infra.yml ps
-redis-cli -h localhost ping   # PONG
+redis-cli -h localhost ping   # Returns PONG
 ```
 
 ---
 
-## Redis Key Structure
+## Redis Key Architecture & Retention
 
-All keys use the prefix defined by `CACHE_KEY_PREFIX` (default: `multi-db-connector`).
+All keys are namespaced using `CACHE_KEY_PREFIX` (default: `multi-db-connector`).
 
-| Key pattern | Type | Used by |
+| Key Pattern | Redis Data Type | Purpose & Lifecycle |
 |---|---|---|
-| `{prefix}:{connector}_*` | String | Cache (API → core) |
-| `{prefix}:scan:queue` | Stream | Queue (API writes, Worker reads) |
-| `{prefix}:scan:job:{id}` | Hash | Job metadata (API + Worker) |
-| `{prefix}:scan:results:{id}` | List | Scan results (Worker writes, API reads) |
-| `{prefix}:scan:jobs` | Sorted Set | Job index by timestamp |
+| `{prefix}:{connector}_*` | String | Introspection Cache (TTL: `REDIS_TTL_SECONDS`, default 1 day) |
+| `{prefix}:scan:queue` | Stream | Job Queue (consumed by `scan-workers` consumer group) |
+| `{prefix}:scan:job:{id}` | Hash | Scan Job Metadata (TTL: `SCAN_RESULTS_TTL_SECONDS`, default 7 days) |
+| `{prefix}:scan:results:{id}` | List | Scanned `TableDescription` Payloads (TTL: `SCAN_RESULTS_TTL_SECONDS`, default 7 days) |
+| `{prefix}:scan:jobs` | Sorted Set | Job Index ordered by creation timestamp (auto-pruned via `zremrangebyscore`) |
+

@@ -16,7 +16,7 @@ class SchemaService:
 
         for c_name in config_names_to_process:
             try:
-                hosts_to_process = [instance_name] if instance_name else self.config_service._get_hosts(c_name)
+                hosts_to_process = self.config_service.resolve_instance_names(c_name, instance_name, no_cache)
 
                 for host in hosts_to_process:
                     logger.info(f"SchemaService: Listing schemas for config: {c_name}, host: {host}")

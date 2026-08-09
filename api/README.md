@@ -6,31 +6,35 @@ FastAPI service exposing database introspection over HTTP. Provides synchronous 
 
 ## Endpoints
 
-### Synchronous — all parameters required (no implicit bulk operations)
+### Synchronous Introspection
 
-| Method | Path | Required body |
-|---|---|---|
-| `GET` | `/configurations` | — |
-| `POST` | `/connect` | `config_name` |
-| `POST` | `/instances` | `config_name` |
-| `POST` | `/schemas` | `config_name`, `instance_name` |
-| `POST` | `/tables` | `config_name`, `instance_name`, `schema_name` |
-| `POST` | `/describe` | `config_name`, `instance_name`, `schema_name`, `table_name` |
+| Method | Path | Required Body Parameters | Description |
+|---|---|---|---|
+| `GET` | `/configurations` | — | List all currently active database configurations |
+| `POST` | `/connect` | `config_name` | Test database connection |
+| `POST` | `/instances` | `config_name` | List database instances (works for multi-host and flat connectors) |
+| `POST` | `/schemas` | `config_name`, `instance_name` | List schemas/databases within an instance |
+| `POST` | `/tables` | `config_name`, `instance_name`, `schema_name` | List tables within a schema |
+| `POST` | `/describe` | `config_name`, `instance_name`, `schema_name`, `table_name` | Describe detailed table structure (columns, PKs, FKs, indexes) |
 
-All endpoints accept the optional header `no-cache: true` to bypass Redis caching.  
-Response format can be switched to TOON via `Accept: application/toon`.
+- **Bypass Redis Cache**: Send header `no-cache: true`.
+- **TOON Payload Format**: Send header `Accept: application/toon` for LLM token reduction.
 
-### Async Scan
+### Async Table Scan Jobs
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/scan` | Enqueue a scan job — returns `job_id` immediately (HTTP 202) |
-| `GET` | `/scan/{job_id}` | Job status; add `?include_results=true` for full `TableDescription` list |
-| `GET` | `/scans?limit=50` | List recent jobs (newest first, no result payloads) |
+| `POST` | `/scan` | Enqueue an async scan job — returns `job_id` immediately (HTTP 202 Accepted) |
+| `GET` | `/scan/{job_id}` | Retrieve job status; add `?include_results=true` for full `TableDescription` list |
+| `GET` | `/scans?limit=50` | List recent scan jobs (newest first, lightweight metadata) |
 
-Scan scope parameters (all optional — omit to scan everything):
+Scan scope parameters (all optional — omit parameters to perform a broader/full scan):
 ```json
-{ "config_name": "mysql_dev", "instance_name": "host", "schema_name": "mydb" }
+{
+  "config_name": "mysql_dev",
+  "instance_name": "db1.company.com",
+  "schema_name": "production"
+}
 ```
 
 ---
@@ -41,13 +45,14 @@ Copy `.env.example` to `.env`.
 
 | Variable | Default | Description |
 |---|---|---|
-| `REDIS_HOST` | `localhost` | Must match Worker's Redis |
-| `REDIS_PORT` | `6379` | |
-| `REDIS_DB` | `0` | |
-| `REDIS_TTL_SECONDS` | `86400` | Introspection cache TTL |
-| `CACHE_KEY_PREFIX` | `multi-db-connector` | Must match Worker's prefix |
+| `REDIS_HOST` | `localhost` | Redis host (must match Worker) |
+| `REDIS_PORT` | `6379` | Redis port |
+| `REDIS_DB` | `0` | Redis database index |
+| `REDIS_TTL_SECONDS` | `86400` | Introspection cache TTL (1 day) |
+| `CACHE_KEY_PREFIX` | `multi-db-connector` | Redis key prefix (must match Worker) |
+| `DB_CONFIG_FILE` | *(none)* | Optional explicit path to `.env` file for Docker container |
 
-DB connection vars — see [root README](../README.md#db-configuration-activation).
+DB connection vars — see [root README](../README.md#db-configuration--activation).
 
 ---
 
@@ -57,15 +62,16 @@ DB connection vars — see [root README](../README.md#db-configuration-activatio
 
 ```bash
 # Start shared Redis first
-docker compose -f ../docker-compose.infra.yml up -d
+docker compose -f ../infra/docker-compose.infra.yml up -d
 
 # Start API
 docker compose up -d
 ```
 
-### Local
+### Local Development
 
 ```bash
 pip install -r requirements.txt
 uvicorn api.src.main:app --host 0.0.0.0 --port 8000 --reload
 ```
+

@@ -1,6 +1,6 @@
 # Core
 
-Shared Python library used by both the **API** and the **Worker**. It provides all database connectors, Pydantic models, Redis cache management, configuration loading, and the async job store.
+Shared Python library used by both the **API** and the **Worker**. It provides database connector abstractions, Pydantic models, Redis cache management, configuration loading, and the async job store.
 
 ---
 
@@ -26,11 +26,11 @@ core/db_connector/
 │   ├── table_details.py  # TableDescription, PrimaryKey, ForeignKey, Index, Partition
 │   └── scan_job.py       # ScanJob, ScanScope, ScanStatus
 ├── interface.py          # BaseConnector abstract class
-├── manager.py            # ConnectorManager (auto-discovers connectors)
+├── manager.py            # ConnectorManager (auto-discovers BaseConnector implementations)
 ├── cache_manager.py      # Redis cache (get/set with prefix + TTL)
-├── config_service.py     # ConfigService — resolves configs to connectors
-├── configurations.py     # DB configuration loading from env vars
-└── job_store.py          # JobStore — Redis Stream queue + job metadata
+├── config_service.py     # ConfigService — resolves configs & instances to connectors
+├── configurations.py     # DB configuration loading from environment variables
+└── job_store.py          # JobStore — Redis Stream queue + job metadata & result storage
 ```
 
 ---
@@ -38,36 +38,40 @@ core/db_connector/
 ## Key Modules
 
 ### `configurations.py`
-Reads database connection parameters from environment variables. A configuration is included **only if its activation env var is set** — no code changes needed to enable/disable a database.
+Reads database connection parameters from environment variables. A configuration is included **only if its activation env var is set**.
+- Supports `DB_CONFIG_FILE` environment variable to explicitly specify the path to a container `.env` file (e.g. `/app/api/.env`), falling back to default `load_dotenv()` discovery when unset.
 
 ### `config_service.py`
-Wraps `ConnectorManager` and `configurations`. Resolves a config name + host to a ready-to-use connector instance.
+Wraps `ConnectorManager` and `configurations`.
+- **`list_instances(config_name, no_cache)`**: Uniformly lists instances for both multi-host configurations (MySQL/MariaDB) and flat configurations (Athena, DynamoDB, Trino, MongoDB, SQLite).
+- **`resolve_instance_names(config_name, instance_name, no_cache)`**: Returns `[instance_name]` if specified, or all discovered instances if `instance_name` is `None`.
+- **`_get_connector_for_host(config_name, host)`**: Returns the connector for a specific host, falling back to flat connection parameters when static host definitions are omitted.
 
 ### `cache_manager.py`
 Redis-backed cache for introspection results. All keys are prefixed with `CACHE_KEY_PREFIX`. Cache can be bypassed per-call with `no_cache=True`.
 
 ### `job_store.py`
 Manages async scan jobs via Redis:
-- **Stream** (`{prefix}:scan:queue`) — job queue for workers
-- **Hash** (`{prefix}:scan:job:{job_id}`) — job metadata and status
-- **List** (`{prefix}:scan:results:{job_id}`) — TableDescription results
-- **Sorted Set** (`{prefix}:scan:jobs`) — index of jobs by creation time
+- **Stream** (`{prefix}:scan:queue`) — job queue for workers (`scan-workers` consumer group).
+- **Hash** (`{prefix}:scan:job:{job_id}`) — job metadata, scope, and status.
+- **List** (`{prefix}:scan:results:{job_id}`) — serialized `TableDescription` results with automatic TTL extensions on writes.
+- **Sorted Set** (`{prefix}:scan:jobs`) — job index ordered by creation timestamp, automatically pruned of entries older than `RESULTS_TTL` via `zremrangebyscore` to prevent Redis memory leaks.
 
 ---
 
 ## Supported Databases
 
-| Database | Connector type |
-|---|---|
-| MySQL / MariaDB | `mysql` |
-| PostgreSQL | `postgres` |
-| SQLite | `sqlite` |
-| DuckDB | `duckdb` |
-| Amazon DynamoDB | `dynamodb` |
-| Amazon Athena | `athena` |
-| MongoDB | `mongodb` |
-| Trino | `trino` |
-| Presto | `presto` |
+| Database | Connector Type | Activation Var | Configuration Style |
+|---|---|---|---|
+| MySQL / MariaDB | `mysql` | `MYSQL_DB1_HOST` / `MYSQL_DB2_HOST` | Multi-host |
+| PostgreSQL | `postgres` | `POSTGRES_HOST` | Single connection |
+| SQLite | `sqlite` | *(always available)* | Single connection |
+| DuckDB | `duckdb` | *(always available)* | Single connection |
+| Amazon DynamoDB | `dynamodb` | `DYNAMODB_REGION` | Flat / Remote discovery |
+| Amazon Athena | `athena` | `ATHENA_REGION` | Flat / Remote discovery |
+| MongoDB | `mongodb` | `MONGODB_HOST` | Single connection |
+| Trino | `trino` | `TRINO_HOST` | Flat / Remote discovery |
+| Presto | `presto` | `PRESTO_HOST` | Flat / Remote discovery |
 
 ---
 
@@ -80,11 +84,12 @@ Copy `.env.example` to `.env` and configure as needed.
 | `REDIS_HOST` | `localhost` | Redis host |
 | `REDIS_PORT` | `6379` | Redis port |
 | `REDIS_DB` | `0` | Redis database index |
-| `REDIS_TTL_SECONDS` | `86400` | Cache TTL (1 day) |
+| `REDIS_TTL_SECONDS` | `86400` | Introspection cache TTL (1 day) |
 | `CACHE_KEY_PREFIX` | `multi-db-connector` | Prefix for all Redis keys |
-| `SCAN_RESULTS_TTL_SECONDS` | `604800` | Scan result retention (7 days) |
+| `SCAN_RESULTS_TTL_SECONDS` | `604800` | Scan result retention in Redis (7 days) |
+| `DB_CONFIG_FILE` | *(none)* | Explicit path to `.env` configuration file |
 
-DB activation vars — see [root README](../README.md#db-configuration-activation).
+DB activation vars — see [root README](../README.md#db-configuration--activation).
 
 ---
 
@@ -102,8 +107,8 @@ pip install -r requirements.txt
 
 ## Adding a New Connector
 
-1. Create `core/db_connector/connectors/mydb.py` implementing `BaseConnector`
-2. Export it from `core/db_connector/connectors/__init__.py`
-3. Add its activation env var and config block to `core/db_connector/configurations.py`
+1. Create `core/db_connector/connectors/mydb.py` implementing `BaseConnector`.
+2. Export it from `core/db_connector/connectors/__init__.py`.
+3. Add its activation env var and config block to `core/db_connector/configurations.py`.
 
-The `ConnectorManager` auto-discovers all classes that extend `BaseConnector`.
+The `ConnectorManager` automatically discovers all classes that extend `BaseConnector`.

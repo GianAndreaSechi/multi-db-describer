@@ -1,7 +1,7 @@
 version: '3.8'
 
 # Requires shared infra to be running:
-#   docker compose -f ../docker-compose.infra.yml up -d
+#   docker compose -f ../infra/docker-compose.infra.yml up -d
 
 services:
   multi-db-api:
@@ -16,6 +16,7 @@ services:
       REDIS_DB: 0
       REDIS_TTL_SECONDS: 86400
       CACHE_KEY_PREFIX: multi-db-connector
+      DB_CONFIG_FILE: /app/api/.env
     networks:
       - multi-db-net
     volumes:

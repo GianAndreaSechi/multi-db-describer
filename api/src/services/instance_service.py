@@ -17,12 +17,10 @@ class InstanceService:
 
         for c_name in config_names:
             logger.info(f"InstanceService: Listing instances for config: {c_name}")
-            for host in self.config_service._get_hosts(c_name):
-                try:
-                    connector = self.config_service._get_connector_for_host(c_name, host)
-                    instances = connector.list_instances(no_cache=no_cache)
-                    all_instances.extend(instances)
-                    logger.info(f"InstanceService: Found {len(instances)} instances for host: {host}, config: {c_name}")
-                except Exception as e:
-                    logger.warning(f"InstanceService: Could not list instances for host {host} in config {c_name}: {e}")
+            try:
+                instances = self.config_service.list_instances(c_name, no_cache=no_cache)
+                all_instances.extend(instances)
+                logger.info(f"InstanceService: Found {len(instances)} instances for config: {c_name}")
+            except Exception as e:
+                logger.warning(f"InstanceService: Could not list instances for config {c_name}: {e}")
         return all_instances

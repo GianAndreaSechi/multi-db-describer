@@ -139,6 +139,12 @@ class JobStore:
         pipe.hset(self._job_key(job.job_id), mapping=fields)
         pipe.expire(self._job_key(job.job_id), RESULTS_TTL)
         pipe.zadd(self._jobs_set_key(), {job.job_id: job.created_at.timestamp()})
+        # The sorted set is shared by all jobs, so a plain key TTL would be
+        # refreshed forever on an active system. Prune expired members per job.
+        pipe.zremrangebyscore(
+            self._jobs_set_key(), "-inf", job.created_at.timestamp() - RESULTS_TTL
+        )
+        pipe.expire(self._jobs_set_key(), RESULTS_TTL)
         pipe.xadd(self._stream_key(), {
             "job_id":        job.job_id,
             "config_name":   fields["config_name"],
@@ -180,7 +186,10 @@ class JobStore:
     # ------------------------------------------------------------------
 
     def append_result(self, job_id: str, table_description_dict: Dict[str, Any]):
-        self.r.rpush(self._results_key(job_id), json.dumps(table_description_dict))
+        pipe = self.r.pipeline()
+        pipe.rpush(self._results_key(job_id), json.dumps(table_description_dict))
+        pipe.expire(self._results_key(job_id), RESULTS_TTL)
+        pipe.execute()
 
     def get_results(self, job_id: str) -> List[Dict[str, Any]]:
         raw = self.r.lrange(self._results_key(job_id), 0, -1)

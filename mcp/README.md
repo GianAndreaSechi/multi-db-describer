@@ -1,35 +1,35 @@
-## MCP — Multi-DB Describer Control Plane
+# MCP — Multi-DB Describer Control Plane
 
-MCP server built with `fastmcp` that exposes API and async scan capabilities as tools for LLM agents (Claude, Gemini, IDE assistants, etc.).
+Model Context Protocol (MCP) server built with `fastmcp` that exposes API introspection and async scan capabilities as tools for LLM agents (Claude, Gemini, Cursor, IDE assistants, etc.).
 
 ---
 
 ## Available Tools
 
-### Introspection (synchronous, all parameters required)
+### Introspection Tools (Synchronous)
 
 | Tool | Parameters | Description |
 |---|---|---|
-| `get_available_connectors` | `no_cache?` | List active DB configurations |
-| `list_instances` | `config_name`, `no_cache?` | List instances for a config |
-| `list_schemas` | `config_name`, `instance_name`, `no_cache?` | List schemas |
-| `list_tables` | `config_name`, `instance_name`, `schema_name`, `no_cache?` | List tables |
-| `describe_table` | `config_name`, `instance_name`, `schema_name`, `table_name`, `no_cache?` | Describe a table |
+| `get_available_connectors` | `no_cache?` | List all active database configurations |
+| `list_instances` | `config_name`, `no_cache?` | List database instances (works for multi-host and flat connectors) |
+| `list_schemas` | `config_name`, `instance_name`, `no_cache?` | List schemas/databases within an instance |
+| `list_tables` | `config_name`, `instance_name`, `schema_name`, `no_cache?` | List tables within a schema |
+| `describe_table` | `config_name`, `instance_name`, `schema_name`, `table_name`, `no_cache?` | Describe a table (columns, primary keys, foreign keys, indexes) |
 
-All introspection tools return data in **TOON** format for LLM efficiency.
+> 💡 **LLM Optimization**: All introspection tools automatically request data in **TOON** format (`Accept: application/toon`), drastically reducing token consumption compared to verbose JSON.
 
-### Async Scan
+### Async Table Scan Tools
 
 | Tool | Parameters | Description |
 |---|---|---|
-| `enqueue_scan` | `config_name?`, `instance_name?`, `schema_name?` | Launch async scan, returns `job_id` |
-| `get_scan_job` | `job_id`, `include_results?` | Job status; with `include_results=True` returns TableDescriptions in TOON |
-| `list_scan_jobs` | `limit?` | List recent scan jobs |
+| `enqueue_scan` | `config_name?`, `instance_name?`, `schema_name?` | Launch an async background scan job — returns `job_id` |
+| `get_scan_job` | `job_id`, `include_results?` | Check job status; set `include_results=True` to fetch full `TableDescription` list |
+| `list_scan_jobs` | `limit?` | List recent scan jobs (newest first) |
 
-Typical LLM flow:
-1. Call `enqueue_scan` → get `job_id`
+Typical LLM agent workflow:
+1. Call `enqueue_scan(config_name="mysql_dev")` → receive `job_id`
 2. Poll `get_scan_job(job_id)` until `status == "completed"`
-3. Call `get_scan_job(job_id, include_results=True)` to read results
+3. Call `get_scan_job(job_id, include_results=True)` to read scanned schemas
 
 ---
 
@@ -39,10 +39,11 @@ Copy `.env.example` to `.env`.
 
 | Variable | Default | Description |
 |---|---|---|
-| `MCP_TRANSPORT` | `http` | `http` or `stdio` |
-| `MCP_HOST` | `0.0.0.0` | Listen address (http transport) |
-| `MCP_PORT` | `8000` | Listen port (http transport) |
-| `API_BASE_URL` | `http://localhost:8000` | URL of the running API service |
+| `MCP_TRANSPORT` | `http` | Transport protocol (`http` or `stdio`) |
+| `MCP_HOST` | `0.0.0.0` | Listen address for HTTP transport |
+| `MCP_PORT` | `8000` | Listen port for HTTP transport |
+| `API_BASE_URL` | `http://localhost:8000` | Address of the running `multi-db-api` service |
+| `DB_CONFIG_FILE` | `/app/api/.env` | Path to container environment configuration file |
 
 ---
 
@@ -50,13 +51,17 @@ Copy `.env.example` to `.env`.
 
 ### Docker Compose
 
+Starting MCP via Docker Compose automatically provisions the **API**, the **MCP Server**, and the **Worker** (which consumes background scan jobs):
+
 ```bash
-# Starts Redis + API + MCP
+# 1. Start shared Redis infrastructure
 docker compose -f ../infra/docker-compose.infra.yml up -d
+
+# 2. Start API + MCP Server + Background Worker
 docker compose up -d
 ```
 
-### Local
+### Local Development
 
 ```bash
 pip install -r requirements.txt
@@ -65,11 +70,11 @@ python -m src.server
 
 ---
 
-## LLM Configuration
+## LLM Client Configuration
 
-### Claude / Gemini (via `mcp-remote`)
+### Claude Desktop / Gemini CLI (via `mcp-remote`)
 
-Add to your MCP client settings (e.g. `~/.gemini/settings.json` or Claude Desktop config):
+Add to your client configuration (e.g. `~/.gemini/settings.json` or `claude_desktop_config.json`):
 
 ```json
 {
@@ -82,5 +87,5 @@ Add to your MCP client settings (e.g. `~/.gemini/settings.json` or Claude Deskto
 }
 ```
 
-Replace `<mcp-host>:<port>` with the address where the MCP server is running.
+Replace `<mcp-host>:<port>` with your MCP server address (e.g. `http://localhost:8000/mcp`).
 
