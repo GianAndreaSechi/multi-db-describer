@@ -2,6 +2,7 @@ from typing import Dict, Any, List, Optional
 from loguru import logger
 
 from core.db_connector.manager import ConnectorManager
+from core.db_connector.config_service import ConfigService
 from core.db_connector.models import Instance, Schema, Table, TableDescription
 from core.db_connector.ai_service import AIDocumentationService
 from core.db_connector.storage import get_metadata_store
@@ -76,4 +77,3 @@ class DescribeTableService:
             except Exception as e:
                 logger.warning(f"DescribeTableService: Could not describe table for configuration {c_name}, instance {instance_name if instance_name else 'all'}, schema {schema_name if schema_name else 'all'}, table {table_name if table_name else 'all'}: {e}")
         return all_table_descriptions
-

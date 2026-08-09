@@ -107,7 +107,7 @@ async def list_instances_route(req: InstanceRequest, http_request: Request, no_c
     for a given connector type. If no connector types are specified,
     instances for all available connector types will be returned.
     """
-    logger.info(f"API: Listing instances for config names: {req.config_names if req.config_names else 'all available'}")
+    logger.info(f"API: Listing instances for config name: {req.config_name}")
     try:
         data = instance_service.list_instances([req.config_name], no_cache=no_cache) # Pass no_cache
         return api_response(http_request, "Instances retrieved successfully.", data)
