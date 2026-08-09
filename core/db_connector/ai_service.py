@@ -47,6 +47,12 @@ class AIDocumentationService:
                 f"AIDocumentationService: Generating AI docs for table '{table_name}' using model '{self.model_name}'"
             )
 
+            kwargs = {}
+            if os.getenv("LITELLM_API_KEY"):
+                kwargs["api_key"] = os.getenv("LITELLM_API_KEY")
+            if os.getenv("LITELLM_API_BASE"):
+                kwargs["api_base"] = os.getenv("LITELLM_API_BASE")
+
             response = litellm.completion(
                 model=self.model_name,
                 messages=[
@@ -57,7 +63,9 @@ class AIDocumentationService:
                     {"role": "user", "content": prompt},
                 ],
                 response_format={"type": "json_object"},
+                **kwargs,
             )
+
 
             content = response.choices[0].message.content
             parsed_doc = json.loads(content) if isinstance(content, str) else content
