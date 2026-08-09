@@ -54,17 +54,19 @@ class JobStore:
             return val.isoformat() if isinstance(val, datetime) else (str(val) if val is not None else "")
 
         return {
-            "job_id":        job.job_id,
-            "status":        job.status.value,
-            "config_name":   job.scope.config_name or "",
-            "instance_name": job.scope.instance_name or "",
-            "schema_name":   job.scope.schema_name or "",
-            "no_cache":      "true" if job.scope.no_cache else "false",
-            "created_at":    _str(job.created_at),
-            "started_at":    _str(job.started_at),
-            "completed_at":  _str(job.completed_at),
-            "error":         job.error or "",
-            "result_count":  str(job.result_count) if job.result_count is not None else "",
+            "job_id":           job.job_id,
+            "status":           job.status.value,
+            "config_name":      job.scope.config_name or "",
+            "instance_name":    job.scope.instance_name or "",
+            "schema_name":      job.scope.schema_name or "",
+            "no_cache":         "true" if job.scope.no_cache else "false",
+            "generate_ai_docs": "true" if job.scope.generate_ai_docs else "false",
+            "save_metadata":    "true" if job.scope.save_metadata else "false",
+            "created_at":       _str(job.created_at),
+            "started_at":       _str(job.started_at),
+            "completed_at":     _str(job.completed_at),
+            "error":            job.error or "",
+            "result_count":     str(job.result_count) if job.result_count is not None else "",
         }
 
     @staticmethod
@@ -81,6 +83,8 @@ class JobStore:
                 instance_name=fields.get("instance_name") or None,
                 schema_name=fields.get("schema_name") or None,
                 no_cache=fields.get("no_cache") == "true",
+                generate_ai_docs=fields.get("generate_ai_docs") == "true",
+                save_metadata=fields.get("save_metadata", "true") == "true",
             ),
             created_at=_dt(fields.get("created_at", "")),
             started_at=_dt(fields.get("started_at", "")),
@@ -146,13 +150,16 @@ class JobStore:
         )
         pipe.expire(self._jobs_set_key(), RESULTS_TTL)
         pipe.xadd(self._stream_key(), {
-            "job_id":        job.job_id,
-            "config_name":   fields["config_name"],
-            "instance_name": fields["instance_name"],
-            "schema_name":   fields["schema_name"],
-            "no_cache":      fields["no_cache"],
+            "job_id":           job.job_id,
+            "config_name":      fields["config_name"],
+            "instance_name":    fields["instance_name"],
+            "schema_name":      fields["schema_name"],
+            "no_cache":         fields["no_cache"],
+            "generate_ai_docs": fields["generate_ai_docs"],
+            "save_metadata":    fields["save_metadata"],
         })
         pipe.execute()
+
 
         logger.info(f"JobStore: Enqueued scan job {job.job_id} scope={scope}")
         return job
