@@ -1,6 +1,6 @@
 # Worker
 
-Async background worker that reads scan jobs from the Redis Stream and executes them using the **core** library. Depends only on **core** — no dependency on the API service.
+Async background worker that reads table scan jobs from the Redis Stream and executes them using the **core** library. Depends only on **core** — no direct dependency on the API service.
 
 ---
 
@@ -9,25 +9,28 @@ Async background worker that reads scan jobs from the Redis Stream and executes 
 ```
 API  ──xadd──►  Redis Stream (scan:queue)
                        │
-                  Worker polls (xreadgroup)
+                  Worker polls (xreadgroup: scan-workers)
                        │
-               ScanExecutorService
+                ScanExecutorService
                        │
-          for each config / instance / schema / table:
-               connector.describe_table()
+           resolves hosts & flat connector instances
                        │
-               Redis List (scan:results:{job_id})
+           for each config / instance / schema / table:
+                connector.describe_table()
                        │
-               job status → completed / failed
+                Redis List (scan:results:{job_id})
+                       │
+                job status → completed / failed
 ```
 
-1. The API enqueues a job to the Redis Stream and immediately returns a `job_id`
-2. The Worker reads the message, calls `mark_running`, then iterates all matching tables
-3. Each `TableDescription` is appended to the Redis results list as it completes
-4. On finish, the Worker calls `mark_completed(count)` or `mark_failed(error)`
-5. The API's `GET /scan/{job_id}?include_results=true` reads results from Redis
+1. The API enqueues a job to the Redis Stream (`{prefix}:scan:queue`) and returns a `job_id` (HTTP 202 Accepted).
+2. The Worker reads the job message via `xreadgroup`, calls `mark_running`, and resolves active targets using `resolve_instance_names` (supporting both multi-host and flat connectors like Athena/DynamoDB).
+3. Each scanned `TableDescription` is appended to the Redis results list (`{prefix}:scan:results:{job_id}`) as it completes, extending key TTL.
+4. On finish, the Worker updates job status via `mark_completed(count)` or `mark_failed(error)`.
+5. The API's `GET /scan/{job_id}?include_results=true` reads results directly from Redis.
 
-On restart, the Worker automatically reclaims messages that were delivered to a dead consumer and never acknowledged.
+### Crash Recovery (`reclaim_abandoned`)
+On startup, the Worker automatically reclaims and re-executes pending stream messages delivered to dead/crashed worker instances using Redis Stream `XPENDING` / `XCLAIM` semantics.
 
 ---
 
@@ -37,15 +40,16 @@ Copy `.env.example` to `.env`.
 
 | Variable | Default | Description |
 |---|---|---|
-| `REDIS_HOST` | `localhost` | Must match API's Redis |
-| `REDIS_PORT` | `6379` | |
-| `REDIS_DB` | `0` | |
-| `REDIS_TTL_SECONDS` | `86400` | Connector cache TTL |
-| `CACHE_KEY_PREFIX` | `multi-db-connector` | Must match API's prefix |
-| `SCAN_RESULTS_TTL_SECONDS` | `604800` | Result retention in Redis (7 days) |
+| `REDIS_HOST` | `localhost` | Redis host (must match API) |
+| `REDIS_PORT` | `6379` | Redis port |
+| `REDIS_DB` | `0` | Redis database index |
+| `REDIS_TTL_SECONDS` | `86400` | Introspection cache TTL |
+| `CACHE_KEY_PREFIX` | `multi-db-connector` | Redis key prefix (must match API) |
+| `SCAN_RESULTS_TTL_SECONDS` | `604800` | Scan result retention in Redis (7 days) |
 | `WORKER_STREAM_BLOCK_MS` | `5000` | Stream read timeout per poll cycle |
+| `DB_CONFIG_FILE` | *(none)* | Explicit path to `.env` file for Docker container |
 
-DB connection vars — see [root README](../README.md#db-configuration-activation).
+DB connection vars — see [root README](../README.md#db-configuration--activation).
 
 ---
 
@@ -55,19 +59,21 @@ DB connection vars — see [root README](../README.md#db-configuration-activatio
 
 ```bash
 # Start shared Redis first
-docker compose -f ../docker-compose.infra.yml up -d
+docker compose -f ../infra/docker-compose.infra.yml up -d
 
 # Start Worker
 docker compose up -d
 ```
 
-### Local
+### Local Development
 
 ```bash
 pip install -r requirements.txt
 python -m worker.src.main
 ```
 
-## Scaling
+---
 
-Multiple worker instances can run concurrently — each registers as a separate consumer in the `scan-workers` consumer group. Redis Stream guarantees each message is delivered to exactly one consumer.
+## Horizontal Scaling
+
+Multiple worker instances can run concurrently. Each worker registers with a unique hostname in the shared `scan-workers` consumer group. Redis Streams guarantees that each scan job message is delivered to exactly one consumer worker.
