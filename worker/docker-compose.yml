@@ -1,7 +1,7 @@
 version: '3.8'
 
 # Requires shared infra to be running:
-#   docker compose -f ../docker-compose.infra.yml up -d
+#   docker compose -f ../infra/docker-compose.infra.yml up -d
 
 services:
   multi-db-worker:
@@ -16,6 +16,7 @@ services:
       CACHE_KEY_PREFIX: multi-db-connector
       SCAN_RESULTS_TTL_SECONDS: 604800   # 7 days
       WORKER_STREAM_BLOCK_MS: 5000
+      DB_CONFIG_FILE: /app/worker/.env
     networks:
       - multi-db-net
     volumes:
