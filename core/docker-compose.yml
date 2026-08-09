@@ -1,31 +1,25 @@
 version: '3.8'
 
 services:
-  redis:
-    image: redis:6-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: always
-
   multi-db-core:
     build:
-      context: .
+      context: ..
       dockerfile: core/Dockerfile
     environment:
-      REDIS_HOST: redis # Connect to the Redis service
+      REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: 0
       REDIS_TTL_SECONDS: 86400
-    depends_on:
-      - redis
+      CACHE_KEY_PREFIX: multi-db-connector
+    networks:
+      - multi-db-net
     volumes:
-      - ./core:/app/core # Mount Core source code for development
+      - ../core:/app/core
     # The CMD from core/Dockerfile will keep the container running
     # You can then exec into it to run tests or interact with the core library
     # e.g., docker-compose exec core bash
     restart: always
 
-volumes:
-  redis_data:
+networks:
+  multi-db-net:
+    external: true
