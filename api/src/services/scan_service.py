@@ -14,14 +14,19 @@ class ScanService:
         instance_name: Optional[str],
         schema_name: Optional[str],
         no_cache: bool = False,
+        generate_ai_docs: bool = False,
+        save_metadata: bool = True,
     ) -> ScanJob:
         scope = ScanScope(
             config_name=config_name,
             instance_name=instance_name,
             schema_name=schema_name,
             no_cache=no_cache,
+            generate_ai_docs=generate_ai_docs,
+            save_metadata=save_metadata,
         )
         return self.job_store.enqueue(scope)
+
 
     def get_job(self, job_id: str) -> Optional[ScanJob]:
         return self.job_store.get_job(job_id)
