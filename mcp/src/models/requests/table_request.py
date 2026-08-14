@@ -20,4 +20,3 @@ class TableRequest(BaseModel):
     )
     limit: Optional[int] = Field(default=None, description="Maximum number of tables to return.")
     offset: Optional[int] = Field(default=None, description="Number of tables to skip.")
-

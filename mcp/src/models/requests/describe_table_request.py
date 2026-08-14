@@ -34,4 +34,3 @@ class DescribeTableRequest(BaseModel):
         default=True,
         description="Persist schema and AI documentation metadata when describing tables.",
     )
-
