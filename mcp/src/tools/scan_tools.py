@@ -22,13 +22,18 @@ def register_tools(mcp):
           - config_name:   limit to a specific DB configuration
           - instance_name: limit to a specific instance within the config
           - schema_name:   limit to a specific schema within the instance
+
+        Options:
+          - generate_ai_docs: generate a business summary and column descriptions via the configured LLM.
+          - save_metadata: persist generated metadata to the configured storage.
         
         Cache:
           - no_cache: if True, bypasses existing cache and forces a fresh scan.
         """
         logger.info(
             f"MCP: Enqueueing scan job "
-            f"[config={request.config_name}, instance={request.instance_name}, schema={request.schema_name}, no_cache={no_cache}]"
+            f"[config={request.config_name}, instance={request.instance_name}, schema={request.schema_name}, "
+            f"generate_ai_docs={request.generate_ai_docs}, no_cache={no_cache}]"
         )
         api_response = await api_client.post(
             "/scan",

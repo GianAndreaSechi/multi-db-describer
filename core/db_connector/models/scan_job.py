@@ -16,6 +16,9 @@ class ScanScope(BaseModel):
     instance_name: Optional[str] = None  # None = all instances
     schema_name: Optional[str] = None    # None = all schemas
     no_cache: bool = False               # If True, bypass cache during scan
+    generate_ai_docs: bool = False       # If True, generate AI documentation via LiteLLM
+    save_metadata: bool = True           # If True, save/update JSON metadata
+
 
 
 class ScanJob(BaseModel):

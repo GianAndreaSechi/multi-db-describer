@@ -37,9 +37,18 @@ core/db_connector/
 
 ## Key Modules
 
+### `storage.py`
+Provides metadata persistence abstractions via `BaseMetadataStore`:
+- **`FileMetadataStore`** (default): Saves JSON documents to disk under `STORAGE_METADATA_DIR` (default: `storage/metadata/`).
+- Structure preserves raw schema introspection in `schema_description` and LLM-generated documentation in `ai_documentation` as separate top-level fields, preventing data overwrites.
+
+### `ai_service.py`
+**`AIDocumentationService`**: Non-blocking integration with LiteLLM (`LITELLM_MODEL`, default `gpt-4o-mini`). Generates high-level business summaries and column descriptions. If `litellm` is uninstalled, API keys are missing, or network errors occur, it logs a warning and gracefully bypasses AI generation without throwing exceptions.
+
 ### `configurations.py`
 Reads database connection parameters from environment variables. A configuration is included **only if its activation env var is set**.
 - Supports `DB_CONFIG_FILE` environment variable to explicitly specify the path to a container `.env` file (e.g. `/app/api/.env`), falling back to default `load_dotenv()` discovery when unset.
+
 
 ### `config_service.py`
 Wraps `ConnectorManager` and `configurations`.

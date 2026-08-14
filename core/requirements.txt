@@ -8,3 +8,5 @@ boto3
 pymongo
 psycopg2-binary
 trino
+litellm
+

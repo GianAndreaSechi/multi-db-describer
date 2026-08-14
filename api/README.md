@@ -28,14 +28,17 @@ FastAPI service exposing database introspection over HTTP. Provides synchronous 
 | `GET` | `/scan/{job_id}` | Retrieve job status; add `?include_results=true` for full `TableDescription` list |
 | `GET` | `/scans?limit=50` | List recent scan jobs (newest first, lightweight metadata) |
 
-Scan scope parameters (all optional — omit parameters to perform a broader/full scan):
+Scan scope & AI doc options (all optional):
 ```json
 {
   "config_name": "mysql_dev",
   "instance_name": "db1.company.com",
-  "schema_name": "production"
+  "schema_name": "production",
+  "generate_ai_docs": true,
+  "save_metadata": true
 }
 ```
+
 
 ---
 

@@ -107,7 +107,7 @@ async def list_instances_route(req: InstanceRequest, http_request: Request, no_c
     for a given connector type. If no connector types are specified,
     instances for all available connector types will be returned.
     """
-    logger.info(f"API: Listing instances for config names: {req.config_names if req.config_names else 'all available'}")
+    logger.info(f"API: Listing instances for config name: {req.config_name}")
     try:
         data = instance_service.list_instances([req.config_name], no_cache=no_cache) # Pass no_cache
         return api_response(http_request, "Instances retrieved successfully.", data)
@@ -181,7 +181,9 @@ async def describe_table_route(req: DescribeTableRequest, http_request: Request,
             req.instance_name,
             req.schema_name,
             req.table_name,
-            no_cache=no_cache # Pass no_cache
+            no_cache=no_cache,
+            generate_ai_docs=req.generate_ai_docs,
+            save_metadata=req.save_metadata,
         )
         return api_response(http_request, "Table description retrieved successfully.", data)
     except ValueError as e:
@@ -213,11 +215,20 @@ async def enqueue_scan(req: ScanRequest, http_request: Request, no_cache: bool =
     """
     logger.info(
         f"API: Enqueuing scan job config={req.config_name}, "
-        f"instance={req.instance_name}, schema={req.schema_name}, no_cache={no_cache}"
+        f"instance={req.instance_name}, schema={req.schema_name}, no_cache={no_cache}, "
+        f"generate_ai_docs={req.generate_ai_docs}, save_metadata={req.save_metadata}"
     )
     try:
-        job = scan_service.enqueue_scan(req.config_name, req.instance_name, req.schema_name, no_cache)
+        job = scan_service.enqueue_scan(
+            req.config_name,
+            req.instance_name,
+            req.schema_name,
+            no_cache=no_cache,
+            generate_ai_docs=req.generate_ai_docs,
+            save_metadata=req.save_metadata,
+        )
         return api_response(http_request, "Scan job enqueued successfully.", job.model_dump(mode="json"))
+
     except ConnectionError as e:
         logger.error(f"API: Scan enqueue failed — Redis unreachable: {e}")
         raise HTTPException(status_code=503, detail=f"Queue unavailable: {e}")

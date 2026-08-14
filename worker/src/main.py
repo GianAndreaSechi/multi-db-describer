@@ -113,20 +113,32 @@ class ScanWorker:
         instance_name = data.get("instance_name") or None
         schema_name = data.get("schema_name") or None
         no_cache = data.get("no_cache") == "true"
+        generate_ai_docs = data.get("generate_ai_docs") == "true"
+        save_metadata = data.get("save_metadata", "true") == "true"
 
         logger.info(
             f"ScanWorker: processing job {job_id} "
-            f"[config={config_name}, instance={instance_name}, schema={schema_name}, no_cache={no_cache}]"
+            f"[config={config_name}, instance={instance_name}, schema={schema_name}, "
+            f"no_cache={no_cache}, generate_ai_docs={generate_ai_docs}, save_metadata={save_metadata}]"
         )
         self.job_store.mark_running(job_id)
 
         try:
-            count = self.executor.execute(job_id, config_name, instance_name, schema_name, no_cache)
+            count = self.executor.execute(
+                job_id,
+                config_name,
+                instance_name,
+                schema_name,
+                no_cache=no_cache,
+                generate_ai_docs=generate_ai_docs,
+                save_metadata=save_metadata,
+            )
             self.job_store.mark_completed(job_id, count)
             logger.info(f"ScanWorker: job {job_id} completed — {count} tables described")
         except Exception as e:
             logger.exception(f"ScanWorker: job {job_id} failed: {e}")
             self.job_store.mark_failed(job_id, str(e))
+
 
         self.job_store.ack(message_id)
 

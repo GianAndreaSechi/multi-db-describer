@@ -1,7 +1,12 @@
-# core/db_connector/__init__.py
-# This file makes the db_connector directory a Python package.
-
 from .manager import ConnectorManager
+from .storage import BaseMetadataStore, FileMetadataStore, get_metadata_store
+from .ai_service import AIDocumentationService
 
-# You can expose a pre-configured manager instance if desired
-# manager = ConnectorManager()
+__all__ = [
+    "ConnectorManager",
+    "BaseMetadataStore",
+    "FileMetadataStore",
+    "get_metadata_store",
+    "AIDocumentationService",
+]
+

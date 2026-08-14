@@ -150,5 +150,7 @@ for col in table_desc.columns:
   - [x] TOON format output for LLM context reduction
   - [x] MCP Server integration for Claude / Gemini / Cursor
   - [x] Unified host and flat instance resolution
-  - [ ] Automatic semantic documentation & LLM-generated table descriptions
+  - [x] Automatic semantic documentation & LLM-generated table descriptions (via LiteLLM)
+  - [x] Abstract metadata storage (`FileMetadataStore` JSON persistence & DB provider interface)
+
 
