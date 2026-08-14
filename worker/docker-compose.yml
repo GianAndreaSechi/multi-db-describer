@@ -9,14 +9,23 @@ services:
       context: ..
       dockerfile: worker/Dockerfile
     environment:
+      ENV: dev
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: 0
       REDIS_TTL_SECONDS: 86400
+      REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS: 2
+      REDIS_CACHE_SOCKET_TIMEOUT_SECONDS: 2
       CACHE_KEY_PREFIX: multi-db-connector
       SCAN_RESULTS_TTL_SECONDS: 604800   # 7 days
       WORKER_STREAM_BLOCK_MS: 5000
+      STORAGE_METADATA_DIR: /app/storage/metadata
       DB_CONFIG_FILE: /app/worker/.env
+      LITELLM_MODEL: ${LITELLM_MODEL:-gpt-4o-mini}
+      LITELLM_API_KEY: ${LITELLM_API_KEY:-}
+      LITELLM_API_BASE: ${LITELLM_API_BASE:-}
+      LITELLM_TIMEOUT_SECONDS: ${LITELLM_TIMEOUT_SECONDS:-120}
+      LITELLM_MAX_RETRIES: ${LITELLM_MAX_RETRIES:-2}
     networks:
       - multi-db-net
     volumes:

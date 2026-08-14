@@ -20,13 +20,13 @@ API  ──xadd──►  Redis Stream (scan:queue)
                        │
                 Redis List (scan:results:{job_id})
                        │
-                job status → completed / failed
+                job status → completed / partial / failed
 ```
 
 1. The API enqueues a job to the Redis Stream (`{prefix}:scan:queue`) and returns a `job_id` (HTTP 202 Accepted).
 2. The Worker reads the job message via `xreadgroup`, calls `mark_running`, and resolves active targets using `resolve_instance_names` (supporting both multi-host and flat connectors like Athena/DynamoDB).
-3. Each scanned `TableDescription` is appended to the Redis results list (`{prefix}:scan:results:{job_id}`). If `generate_ai_docs=true`, `AIDocumentationService` generates an LLM summary via LiteLLM; if `save_metadata=true`, metadata is persisted to disk/store.
-4. On finish, the Worker updates job status via `mark_completed(count)` or `mark_failed(error)`.
+3. Each scanned `TableDescription` is appended to the Redis results list (`{prefix}:scan:results:{job_id}`). If `generate_ai_docs=true`, results include `ai_documentation`, `ai_generation_status`, and `ai_generation_error`; if `save_metadata=true`, metadata is also persisted to disk/store.
+4. On finish, the Worker updates job status via `mark_completed(count)`, `mark_partial(count, error)`, or `mark_failed(error)`.
 5. The API's `GET /scan/{job_id}?include_results=true` reads results directly from Redis.
 
 ### Crash Recovery (`reclaim_abandoned`)
@@ -48,11 +48,14 @@ Copy `.env.example` to `.env`.
 | `SCAN_RESULTS_TTL_SECONDS` | `604800` | Scan result retention in Redis (7 days) |
 | `WORKER_STREAM_BLOCK_MS` | `5000` | Stream read timeout per poll cycle |
 | `DB_CONFIG_FILE` | *(none)* | Explicit path to `.env` file for Docker container |
+| `DB_TARGETS` | *(none)* | Comma-separated list of named DB targets |
 | `LITELLM_MODEL` | `gpt-4o-mini` | LLM model for AI doc generation (via LiteLLM) |
+| `LITELLM_API_KEY` | *(none)* | Optional LiteLLM API key override |
+| `LITELLM_API_BASE` | *(none)* | Optional LiteLLM API base URL |
 | `STORAGE_METADATA_DIR` | `storage/metadata` | Directory for JSON metadata files |
 
 
-DB connection vars — see [root README](../README.md#db-configuration--activation).
+DB target variables — see [root README](../README.md#db-configuration--activation).
 
 ---
 
@@ -80,3 +83,5 @@ python -m worker.src.main
 ## Horizontal Scaling
 
 Multiple worker instances can run concurrently. Each worker registers with a unique hostname in the shared `scan-workers` consumer group. Redis Streams guarantees that each scan job message is delivered to exactly one consumer worker.
+
+Jobs that complete with at least one failed table/config are marked `partial`; jobs with no successful table descriptions are marked `failed`.
