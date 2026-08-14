@@ -9,4 +9,6 @@ pymongo
 psycopg2-binary
 trino
 litellm
+fakeredis
+httpx
 

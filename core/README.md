@@ -43,11 +43,14 @@ Provides metadata persistence abstractions via `BaseMetadataStore`:
 - Structure preserves raw schema introspection in `schema_description` and LLM-generated documentation in `ai_documentation` as separate top-level fields, preventing data overwrites.
 
 ### `ai_service.py`
-**`AIDocumentationService`**: Non-blocking integration with LiteLLM (`LITELLM_MODEL`, default `gpt-4o-mini`). Generates high-level business summaries and column descriptions. If `litellm` is uninstalled, API keys are missing, or network errors occur, it logs a warning and gracefully bypasses AI generation without throwing exceptions.
+**`AIDocumentationService`**: Non-blocking integration with LiteLLM (`LITELLM_MODEL`, default `gpt-4o-mini`). Generates high-level business summaries and column descriptions. When requested, generated docs are attached to `TableDescription.ai_documentation` with `ai_generation_status`; failures also include `ai_generation_error`. If `litellm` is uninstalled, API keys are missing, or network errors occur, it logs a warning and returns no documentation without throwing exceptions.
 
 ### `configurations.py`
-Reads database connection parameters from environment variables. A configuration is included **only if its activation env var is set**.
+Reads database connection parameters from environment variables. `DB_TARGETS` supports any number of named targets for any connector.
 - Supports `DB_CONFIG_FILE` environment variable to explicitly specify the path to a container `.env` file (e.g. `/app/api/.env`), falling back to default `load_dotenv()` discovery when unset.
+- Target names from `DB_TARGETS` become API/MCP `config_name` values. Example: `DB_TARGETS=sales_mysql,analytics_pg` creates `sales_mysql` and `analytics_pg` configurations.
+- Each target uses `DB_TARGET_<TARGET_KEY>_*` variables, where `<TARGET_KEY>` is the uppercased target name with non-alphanumeric characters replaced by underscores.
+- Exact required and optional keys for each connector type are documented in the root README under **DB Configuration & Activation**.
 
 
 ### `config_service.py`
@@ -70,17 +73,17 @@ Manages async scan jobs via Redis:
 
 ## Supported Databases
 
-| Database | Connector Type | Activation Var | Configuration Style |
+| Database | Connector Type | Configuration Style |
 |---|---|---|---|
-| MySQL / MariaDB | `mysql` | `MYSQL_DB1_HOST` / `MYSQL_DB2_HOST` | Multi-host |
-| PostgreSQL | `postgres` | `POSTGRES_HOST` | Single connection |
-| SQLite | `sqlite` | *(always available)* | Single connection |
-| DuckDB | `duckdb` | *(always available)* | Single connection |
-| Amazon DynamoDB | `dynamodb` | `DYNAMODB_REGION` | Flat / Remote discovery |
-| Amazon Athena | `athena` | `ATHENA_REGION` | Flat / Remote discovery |
-| MongoDB | `mongodb` | `MONGODB_HOST` | Single connection |
-| Trino | `trino` | `TRINO_HOST` | Flat / Remote discovery |
-| Presto | `presto` | `PRESTO_HOST` | Flat / Remote discovery |
+| MySQL / MariaDB | `mysql` | Named `DB_TARGETS` |
+| PostgreSQL | `postgres` | Named `DB_TARGETS` |
+| SQLite | `sqlite` | Named `DB_TARGETS` |
+| DuckDB | `duckdb` | Named `DB_TARGETS` |
+| Amazon DynamoDB | `dynamodb` | Named `DB_TARGETS` |
+| Amazon Athena | `athena` | Named `DB_TARGETS` |
+| MongoDB | `mongodb` | Named `DB_TARGETS` |
+| Trino | `trino` | Named `DB_TARGETS` |
+| Presto | `presto` | Named `DB_TARGETS` |
 
 ---
 
@@ -97,6 +100,11 @@ Copy `.env.example` to `.env` and configure as needed.
 | `CACHE_KEY_PREFIX` | `multi-db-connector` | Prefix for all Redis keys |
 | `SCAN_RESULTS_TTL_SECONDS` | `604800` | Scan result retention in Redis (7 days) |
 | `DB_CONFIG_FILE` | *(none)* | Explicit path to `.env` configuration file |
+| `DB_TARGETS` | *(none)* | Comma-separated list of named DB targets |
+| `STORAGE_METADATA_DIR` | `storage/metadata` | Metadata JSON output directory |
+| `LITELLM_MODEL` | `gpt-4o-mini` | LiteLLM model for AI documentation |
+| `LITELLM_API_KEY` | *(none)* | Optional provider API key override |
+| `LITELLM_API_BASE` | *(none)* | Optional custom LiteLLM API base URL |
 
 DB activation vars — see [root README](../README.md#db-configuration--activation).
 
