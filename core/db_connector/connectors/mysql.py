@@ -1,9 +1,11 @@
 import re
+import hashlib
 import mysql.connector
 import mysql.connector.pooling
 from typing import Dict, Any, List, Optional
 from core.db_connector.interface import BaseConnector
 from core.db_connector.models import Instance, Schema, Table, Column, PrimaryKey, ForeignKey, Index, TableDescription
+from core.db_connector.sql_utils import quote_identifier, validate_limit_offset
 from loguru import logger
 from ..cache_manager import CacheManager
 
@@ -30,10 +32,15 @@ class MySQLConnector(BaseConnector):
             logger.error("MySQL connector requires 'host', 'user', and 'password' in connection_params.")
             raise ValueError("MySQL connector requires 'host', 'user', and 'password' in connection_params.")
 
-        pool_key = f"{self.host}:{self.port}:{self.user}"
+        password_fingerprint = hashlib.sha256((self.password or "").encode()).hexdigest()[:12]
+        pool_key = f"{self.host}:{self.port}:{self.user}:{password_fingerprint}"
         if pool_key not in MySQLConnector._pools:
             try:
-                pool_name = re.sub(r'[^a-zA-Z0-9_]', '_', f"mysql_{self.host}_{self.port}")[:64]
+                pool_name = re.sub(
+                    r'[^a-zA-Z0-9_]',
+                    '_',
+                    f"mysql_{self.host}_{self.port}_{self.user}_{password_fingerprint}",
+                )[:64]
                 MySQLConnector._pools[pool_key] = mysql.connector.pooling.MySQLConnectionPool(
                     pool_name=pool_name,
                     pool_size=pool_size,
@@ -108,6 +115,7 @@ class MySQLConnector(BaseConnector):
         return schemas
 
     def list_tables(self, instance_name: str, schema_name: str, limit: Optional[int] = None, offset: Optional[int] = None, no_cache: bool = False) -> List[Table]:
+        limit, offset = validate_limit_offset(limit, offset)
         cache_key = f"mysql_tables:{self.host}:{instance_name}:{schema_name}:{limit}:{offset}"
         cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
         if cached_data:
@@ -117,18 +125,27 @@ class MySQLConnector(BaseConnector):
             logger.error(f"Instance name '{instance_name}' does not match connected host '{self.host}'")
             raise ValueError(f"Instance name '{instance_name}' does not match connected host '{self.host}'")
         
-        query = f"SHOW TABLES FROM `{schema_name}`"
-        
+        query = (
+            "SELECT TABLE_NAME "
+            "FROM information_schema.TABLES "
+            "WHERE TABLE_SCHEMA = %s "
+            "ORDER BY TABLE_NAME"
+        )
+        params: list[Any] = [schema_name]
         if limit is not None:
-            query += f" LIMIT {limit}"
-        if offset is not None:
-            query += f" OFFSET {offset}"
+            query += " LIMIT %s"
+            params.append(limit)
+            if offset is not None:
+                query += " OFFSET %s"
+                params.append(offset)
+        elif offset is not None:
+            query += " LIMIT 18446744073709551615 OFFSET %s"
+            params.append(offset)
 
         query += ";"
 
-        rows = self._execute_query(query, database=schema_name)
-        table_key = f"Tables_in_{schema_name}"
-        tables = [Table(name=row[table_key], schema_name=schema_name) for row in rows]
+        rows = self._execute_query(query, tuple(params), database="information_schema")
+        tables = [Table(name=row["TABLE_NAME"], schema_name=schema_name) for row in rows]
         self.cache_manager.set_cached_data(cache_key, [t.model_dump() for t in tables])
         return tables
 
@@ -143,7 +160,10 @@ class MySQLConnector(BaseConnector):
             raise ValueError(f"Instance name '{instance_name}' does not match connected host '{self.host}'")
         
         # Fetch columns
-        query_columns = f"SHOW COLUMNS FROM `{schema_name}`.`{table_name}`;"
+        query_columns = (
+            f"SHOW COLUMNS FROM {quote_identifier(schema_name, '`')}."
+            f"{quote_identifier(table_name, '`')};"
+        )
         column_rows = self._execute_query(query_columns, database=schema_name)
         
         columns = []
@@ -176,32 +196,32 @@ class MySQLConnector(BaseConnector):
         return table_description
 
     def _get_primary_key_details(self, schema_name: str, table_name: str) -> Optional[PrimaryKey]:
-        query = f"""
+        query = """
             SELECT COLUMN_NAME
             FROM information_schema.KEY_COLUMN_USAGE
-            WHERE TABLE_SCHEMA = '{schema_name}'
-              AND TABLE_NAME = '{table_name}'
+            WHERE TABLE_SCHEMA = %s
+              AND TABLE_NAME = %s
               AND CONSTRAINT_NAME = 'PRIMARY'
             ORDER BY ORDINAL_POSITION;
         """
-        rows = self._execute_query(query, database='information_schema')
+        rows = self._execute_query(query, (schema_name, table_name), database='information_schema')
         if rows:
             return PrimaryKey(column_names=[row['COLUMN_NAME'] for row in rows])
         return None
 
     def _get_foreign_key_details(self, schema_name: str, table_name: str) -> List[ForeignKey]:
-        query = f"""
+        query = """
             SELECT
                 kcu.COLUMN_NAME,
                 kcu.REFERENCED_TABLE_NAME,
                 kcu.REFERENCED_COLUMN_NAME,
                 kcu.CONSTRAINT_NAME
             FROM information_schema.KEY_COLUMN_USAGE AS kcu
-            WHERE kcu.TABLE_SCHEMA = '{schema_name}'
-              AND kcu.TABLE_NAME = '{table_name}'
+            WHERE kcu.TABLE_SCHEMA = %s
+              AND kcu.TABLE_NAME = %s
               AND kcu.REFERENCED_TABLE_NAME IS NOT NULL;
         """
-        rows = self._execute_query(query, database='information_schema')
+        rows = self._execute_query(query, (schema_name, table_name), database='information_schema')
         foreign_keys = []
         for row in rows:
             foreign_keys.append(
@@ -215,18 +235,18 @@ class MySQLConnector(BaseConnector):
         return foreign_keys
 
     def _get_index_details(self, schema_name: str, table_name: str) -> List[Index]:
-        query = f"""
+        query = """
             SELECT
                 INDEX_NAME,
                 COLUMN_NAME,
                 NON_UNIQUE,
                 SEQ_IN_INDEX
             FROM information_schema.STATISTICS
-            WHERE TABLE_SCHEMA = '{schema_name}'
-              AND TABLE_NAME = '{table_name}'
+            WHERE TABLE_SCHEMA = %s
+              AND TABLE_NAME = %s
             ORDER BY INDEX_NAME, SEQ_IN_INDEX;
         """
-        rows = self._execute_query(query, database='information_schema')
+        rows = self._execute_query(query, (schema_name, table_name), database='information_schema')
         
         indexes_map = {}
         for row in rows:
@@ -242,4 +262,3 @@ class MySQLConnector(BaseConnector):
             indexes_map[index_name]['column_names'].append(row['COLUMN_NAME'])
         
         return [Index(**idx) for idx in indexes_map.values()]
-

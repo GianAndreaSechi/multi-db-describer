@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 from core.db_connector.interface import BaseConnector
 from core.db_connector.models import Instance, Schema, Table, Column, TableDescription
 from core.db_connector.models.table_details import PrimaryKey, ForeignKey, Index
+from core.db_connector.sql_utils import quote_sql_string, validate_limit_offset
 from loguru import logger
 from ..cache_manager import CacheManager # Import CacheManager
 
@@ -73,6 +74,7 @@ class SQLiteConnector(BaseConnector):
         return schemas
 
     def list_tables(self, instance_name: str, schema_name: str, limit: Optional[int] = None, offset: Optional[int] = None, no_cache: bool = False) -> List[Table]:
+        limit, offset = validate_limit_offset(limit, offset)
         cache_key = f"sqlite_tables:{self.db_path}:{instance_name}:{schema_name}:{limit}:{offset}"
         cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
         if cached_data:
@@ -106,7 +108,7 @@ class SQLiteConnector(BaseConnector):
             logger.error("Invalid instance or schema for SQLite.")
             raise ValueError("Invalid instance or schema for SQLite.")
         
-        query = f"PRAGMA table_info('{table_name}');"
+        query = f"PRAGMA table_info({quote_sql_string(table_name)});"
         rows = self._execute_query(query)
         
         columns = []
@@ -115,7 +117,7 @@ class SQLiteConnector(BaseConnector):
                 Column(
                     name=row["name"],
                     data_type=row["type"],
-                    is_nullable=bool(not row["notnull"]), # 0 for NOT NULL, 1 for NULL
+                    is_nullable=bool(not row["notnull"]) and row["pk"] == 0,
                     default_value=row["dflt_value"],
                     comment=None # SQLite PRAGMA does not provide column comments directly
                 )
@@ -146,7 +148,7 @@ class SQLiteConnector(BaseConnector):
         return PrimaryKey(column_names=pk_columns) if pk_columns else None
 
     def _get_foreign_key_details(self, table_name: str) -> List[ForeignKey]:
-        rows = self._execute_query(f"PRAGMA foreign_key_list('{table_name}');")
+        rows = self._execute_query(f"PRAGMA foreign_key_list({quote_sql_string(table_name)});")
         foreign_keys = []
         for row in rows:
             foreign_keys.append(ForeignKey(
@@ -158,13 +160,13 @@ class SQLiteConnector(BaseConnector):
         return foreign_keys
 
     def _get_index_details(self, table_name: str) -> List[Index]:
-        index_list = self._execute_query(f"PRAGMA index_list('{table_name}');")
+        index_list = self._execute_query(f"PRAGMA index_list({quote_sql_string(table_name)});")
         indexes = []
         for idx in index_list:
             index_name = idx["name"]
             is_unique = bool(idx["unique"])
             is_primary = idx.get("origin") == "pk"
-            col_rows = self._execute_query(f"PRAGMA index_info('{index_name}');")
+            col_rows = self._execute_query(f"PRAGMA index_info({quote_sql_string(index_name)});")
             col_names = [r["name"] for r in sorted(col_rows, key=lambda r: r["seqno"])]
             indexes.append(Index(
                 name=index_name,

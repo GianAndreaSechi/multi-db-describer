@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 from core.db_connector.interface import BaseConnector
 from core.db_connector.models import Instance, Schema, Table, Column, TableDescription
 from core.db_connector.models.table_details import PrimaryKey, Partition, Index
+from core.db_connector.sql_utils import validate_limit_offset
 from loguru import logger
 from ..cache_manager import CacheManager
 
@@ -111,6 +112,7 @@ class DynamoDBConnector(BaseConnector):
         offset: Optional[int] = None,
         no_cache: bool = False,
     ) -> List[Table]:
+        limit, offset = validate_limit_offset(limit, offset)
         cache_key = f"dynamodb_tables:{self.region}:{instance_name}:{schema_name}:{limit}:{offset}"
         cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
         if cached_data:
