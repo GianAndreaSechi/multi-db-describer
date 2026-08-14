@@ -1,6 +1,6 @@
 # Core
 
-Shared Python library used by both the **API** and the **Worker**. It provides database connector abstractions, Pydantic models, Redis cache management, configuration loading, and the async job store.
+Shared Python library used by both the **API** and the **Worker**. It provides database connector abstractions, Pydantic models, Redis cache management, configuration loading, metadata persistence, and the async job store.
 
 ---
 
@@ -30,6 +30,7 @@ core/db_connector/
 ├── cache_manager.py      # Redis cache (get/set with prefix + TTL)
 ├── config_service.py     # ConfigService — resolves configs & instances to connectors
 ├── configurations.py     # DB configuration loading from environment variables
+├── storage.py            # Metadata persistence (BaseMetadataStore + FileMetadataStore)
 └── job_store.py          # JobStore — Redis Stream queue + job metadata & result storage
 ```
 
@@ -38,9 +39,42 @@ core/db_connector/
 ## Key Modules
 
 ### `storage.py`
-Provides metadata persistence abstractions via `BaseMetadataStore`:
-- **`FileMetadataStore`** (default): Saves JSON documents to disk under `STORAGE_METADATA_DIR` (default: `storage/metadata/`).
-- Structure preserves raw schema introspection in `schema_description` and LLM-generated documentation in `ai_documentation` as separate top-level fields, preventing data overwrites.
+
+Provides metadata persistence abstractions.
+
+**`BaseMetadataStore`** — abstract interface with these methods:
+
+| Method | Description |
+|---|---|
+| `save_table_metadata(...)` | Write or update a table metadata document |
+| `get_table_metadata(...)` | Read a stored document by config+instance+schema+table |
+| `list_instances(page, page_size)` | Paginated list of all stored instance names |
+| `list_databases(instance_name, page, page_size)` | Paginated list of databases for an instance |
+| `list_tables_metadata(instance_name, database_name, page, page_size)` | Paginated list of table names |
+| `find_table_metadata(instance_name, database_name, table_name)` | Look up a table across all configs |
+| `update_table_metadata(instance_name, database_name, table_name, payload)` | Merge custom fields into a stored document |
+
+**`FileMetadataStore`** (default) — saves JSON documents under `STORAGE_METADATA_DIR` with the layout `{config}/{instance}/{schema}/{table}.json`.
+
+Key behaviours:
+
+- **Custom field carry-forward**: any key not in `_SYSTEM_KEYS` (`metadata_key`, `config_name`, `instance_name`, `schema_name`, `table_name`, `updated_at`, `schema_description`, `ai_documentation`) is preserved across re-describe calls. Human-added fields such as `owner`, `tags`, and `notes` survive schema refreshes.
+- **`only_if_changed`**: when `True`, `save_table_metadata` skips the write if `schema_description` is identical to the stored version, leaving `updated_at` and human annotations untouched. Returns `{..., "_unchanged": True}` when skipping.
+- **`ai_documentation` preservation**: if `ai_documentation=None` is passed, the existing stored AI doc is kept rather than overwritten.
+- **Protected fields**: `update_table_metadata` silently ignores `metadata_key`, `config_name`, `instance_name`, `schema_name`, `table_name`, and `updated_at` in the payload — these are always managed by the system.
+
+Paginated list responses follow this envelope:
+```json
+{
+  "items": ["name_a", "name_b"],
+  "total": 2,
+  "page": 1,
+  "page_size": 20,
+  "pages": 1
+}
+```
+
+Use `get_metadata_store()` (factory function) to obtain the configured store. Set `METADATA_STORE_TYPE=file` (default) or extend with future backends (`s3`, `athena`).
 
 ### `ai_service.py`
 **`AIDocumentationService`**: Non-blocking integration with LiteLLM (`LITELLM_MODEL`, default `gpt-4o-mini`). Generates high-level business summaries and column descriptions. When requested, generated docs are attached to `TableDescription.ai_documentation` with `ai_generation_status`; failures also include `ai_generation_error`. If `litellm` is uninstalled, API keys are missing, or network errors occur, it logs a warning and returns no documentation without throwing exceptions.
@@ -51,7 +85,6 @@ Reads database connection parameters from environment variables. `DB_TARGETS` su
 - Target names from `DB_TARGETS` become API/MCP `config_name` values. Example: `DB_TARGETS=sales_mysql,analytics_pg` creates `sales_mysql` and `analytics_pg` configurations.
 - Each target uses `DB_TARGET_<TARGET_KEY>_*` variables, where `<TARGET_KEY>` is the uppercased target name with non-alphanumeric characters replaced by underscores.
 - Exact required and optional keys for each connector type are documented in the root README under **DB Configuration & Activation**.
-
 
 ### `config_service.py`
 Wraps `ConnectorManager` and `configurations`.
@@ -74,7 +107,7 @@ Manages async scan jobs via Redis:
 ## Supported Databases
 
 | Database | Connector Type | Configuration Style |
-|---|---|---|---|
+|---|---|---|
 | MySQL / MariaDB | `mysql` | Named `DB_TARGETS` |
 | PostgreSQL | `postgres` | Named `DB_TARGETS` |
 | SQLite | `sqlite` | Named `DB_TARGETS` |
@@ -102,6 +135,7 @@ Copy `.env.example` to `.env` and configure as needed.
 | `DB_CONFIG_FILE` | *(none)* | Explicit path to `.env` configuration file |
 | `DB_TARGETS` | *(none)* | Comma-separated list of named DB targets |
 | `STORAGE_METADATA_DIR` | `storage/metadata` | Metadata JSON output directory |
+| `METADATA_STORE_TYPE` | `file` | Metadata store backend (`file`; `s3`/`athena` planned) |
 | `LITELLM_MODEL` | `gpt-4o-mini` | LiteLLM model for AI documentation |
 | `LITELLM_API_KEY` | *(none)* | Optional provider API key override |
 | `LITELLM_API_BASE` | *(none)* | Optional custom LiteLLM API base URL |
