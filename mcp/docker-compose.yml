@@ -34,6 +34,7 @@ services:
       - "8001:8000"
     environment:
       API_BASE_URL: http://multi-db-api:8000
+      API_PREFIX: /api/v1
     depends_on:
       - multi-db-api
     networks:

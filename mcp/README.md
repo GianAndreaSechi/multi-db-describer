@@ -1,12 +1,14 @@
 # MCP — Multi-DB Describer Control Plane
 
-Model Context Protocol (MCP) server built with `fastmcp` that exposes API introspection and async scan capabilities as tools for LLM agents (Claude, Gemini, Cursor, IDE assistants, etc.).
+Model Context Protocol (MCP) server built with `fastmcp` that exposes API introspection, async scan capabilities, and stored metadata read/write as tools for LLM agents (Claude, Gemini, Cursor, IDE assistants, etc.).
 
 ---
 
 ## Available Tools
 
-### Introspection Tools (Synchronous)
+### Introspection Tools (Synchronous, Live DB)
+
+These tools query the live database through the API. Results are TOON-compressed to minimise token consumption.
 
 | Tool | Parameters | Description |
 |---|---|---|
@@ -16,7 +18,7 @@ Model Context Protocol (MCP) server built with `fastmcp` that exposes API intros
 | `list_tables` | `config_name?`, `instance_name?`, `schema_name?`, `limit?`, `offset?`, `no_cache?` | List tables. Omitted scope fields expand the query |
 | `describe_table` | `config_name?`, `instance_name?`, `schema_name?`, `table_name?`, `generate_ai_docs?`, `save_metadata?`, `no_cache?` | Describe tables with optional AI documentation |
 
-> 💡 **LLM Optimization**: All introspection tools automatically request data in **TOON** format (`Accept: application/toon`), drastically reducing token consumption compared to verbose JSON.
+> **LLM Optimization**: All introspection tools automatically request data in **TOON** format (`Accept: application/toon`), drastically reducing token consumption compared to verbose JSON.
 
 ### Async Table Scan Tools
 
@@ -31,6 +33,22 @@ Typical LLM agent workflow:
 2. Poll `get_scan_job(job_id)` until `status` is `completed`, `partial`, or `failed`
 3. Call `get_scan_job(job_id, include_results=True)` to read scanned schemas
 
+### Metadata Store Tools (Stored Snapshots)
+
+These tools read from and write to the **stored metadata snapshots** — JSON documents saved to disk by `/describe` and scan jobs. Unlike the live introspection tools, the data here may be **stale** and may include **human-added annotations** (owner, tags, notes, etc.) that are not present in the live database.
+
+Use these tools to inspect what has been catalogued so far, or to read/update human-enriched metadata.
+
+| Tool | Parameters | Description |
+|---|---|---|
+| `list_stored_instances` | `page?`, `page_size?` | List all instances with stored metadata snapshots |
+| `list_stored_databases` | `instance_name`, `page?`, `page_size?` | List all databases stored for an instance |
+| `list_stored_tables` | `instance_name`, `database_name`, `page?`, `page_size?` | List all tables stored for an instance+database |
+| `get_stored_table_metadata` | `instance_name`, `database_name`, `table_name` | Get full stored metadata for a table (TOON-compressed) |
+| `update_stored_table_metadata` | `instance_name`, `database_name`, `table_name`, `fields` | Merge custom fields into a stored metadata document |
+
+`update_stored_table_metadata` accepts any `fields` dict. Protected system fields (`metadata_key`, `config_name`, `instance_name`, `schema_name`, `table_name`, `updated_at`) are ignored; everything else is merged in.
+
 ---
 
 ## Environment Variables
@@ -43,6 +61,7 @@ Copy `.env.example` to `.env`.
 | `MCP_HOST` | `0.0.0.0` | Listen address for HTTP transport |
 | `MCP_PORT` | `8000` | Listen port for HTTP transport |
 | `API_BASE_URL` | `http://localhost:8000` | Address of the running `multi-db-api` service |
+| `API_PREFIX` | `/api/v1` | API version prefix — must match the API service setting |
 
 ---
 
