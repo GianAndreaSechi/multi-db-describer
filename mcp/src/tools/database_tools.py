@@ -11,14 +11,18 @@ from ..models.responses.generic_response import GenericResponse, ToonResponse, U
 from ..constants import TOON_RESPONSE_FORMAT
 
 def register_tools(mcp):
-    """Register all car_data tools for the MCP Server"""
+    """Register all database introspection tools for the MCP Server."""
 
     @mcp.tool()
     async def get_available_connectors(no_cache: Optional[bool] = False) -> UnifiedResponse:
         """
-        Get a list of all available database connector types from the API service.
+        Get configured database target names from the API service.
+
+        The returned values are config_name values to pass to the other tools,
+        for example 'mysql_publishers_dev'. They are not network hosts and not
+        connector types like 'mysql'.
         """
-        logger.info("MCP: Fetching available connector types from API service.")
+        logger.info("MCP: Fetching available database configurations from API service.")
         response_format = TOON_RESPONSE_FORMAT
         api_response = await api_client.get("/configurations", no_cache=no_cache, response_format=response_format)
         if "error" in api_response:
@@ -27,12 +31,15 @@ def register_tools(mcp):
         if response_format == TOON_RESPONSE_FORMAT:
             return ToonResponse(toon=toons.dumps(api_response.get("data")))
             
-        return GenericResponse(message="Available connector types retrieved successfully from API.", data=api_response.get("data"))
+        return GenericResponse(message="Available database configurations retrieved successfully from API.", data=api_response.get("data"))
 
     @mcp.tool()
     async def list_instances(request: InstanceRequest, no_cache: Optional[bool] = False) -> UnifiedResponse:
         """
-        List instances for specific configurations by calling the API service.
+        List database instances for configured targets by calling the API service.
+
+        Use config_name for the configured target, e.g. 'mysql_publishers_dev'.
+        For MySQL, returned instance names are the configured MySQL hosts.
         """
         logger.info(f"MCP: Listing instances for config '{request.config_name}' via API service.")
         response_format = TOON_RESPONSE_FORMAT
@@ -48,7 +55,10 @@ def register_tools(mcp):
     @mcp.tool()
     async def list_schemas(request: SchemaRequest, no_cache: Optional[bool] = False) -> UnifiedResponse:
         """
-        List schemas for a specific instance by calling the API service.
+        List schemas/databases for a configured target and instance by calling the API service.
+
+        Use config_name for the configured target, e.g. 'mysql_publishers_dev'.
+        Use instance_name from list_instances; for MySQL this is the configured MySQL host.
         """
         logger.info(f"MCP: Listing schemas for instance '{request.instance_name}' in config '{request.config_name}' via API.")
         response_format = TOON_RESPONSE_FORMAT
@@ -64,7 +74,10 @@ def register_tools(mcp):
     @mcp.tool()
     async def list_tables(request: TableRequest, no_cache: Optional[bool] = False) -> UnifiedResponse:
         """
-        List tables for a specific schema by calling the API service.
+        List tables for a schema/database by calling the API service.
+
+        Use config_name for the configured target, instance_name from list_instances,
+        and schema_name for the database/schema, e.g. 'quality_checks'.
         """
         logger.info(f"MCP: Listing tables for schema '{request.schema_name}' in instance '{request.instance_name}' via API.")
         response_format = TOON_RESPONSE_FORMAT
@@ -80,9 +93,17 @@ def register_tools(mcp):
     @mcp.tool()
     async def describe_table(request: DescribeTableRequest, no_cache: Optional[bool] = False) -> UnifiedResponse:
         """
-        Describe a specific table by calling the API service.
+        Describe one or more tables by calling the API service.
+
+        Use config_name for the configured target, instance_name from list_instances,
+        schema_name for the database/schema, and table_name for a specific table.
+        Set generate_ai_docs=True whenever the user asks for AI analysis,
+        AI documentation, business documentation, or an AI-generated explanation.
         """
-        logger.info(f"MCP: Describing table '{request.table_name}' in schema '{request.schema_name}' via API.")
+        logger.info(
+            f"MCP: Describing table '{request.table_name}' in schema '{request.schema_name}' via API "
+            f"(generate_ai_docs={request.generate_ai_docs}, save_metadata={request.save_metadata})."
+        )
         response_format = TOON_RESPONSE_FORMAT
         api_response = await api_client.post("/describe", payload=request.model_dump(), no_cache=no_cache, response_format=response_format)
         if "error" in api_response:
