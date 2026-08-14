@@ -1,9 +1,9 @@
-from typing import Dict, Any, List, Optional
+from typing import List, Optional
 from loguru import logger
 
 from core.db_connector.manager import ConnectorManager
 from core.db_connector.models import Instance
-from core.db_connector.config_service import ConfigService # New import
+from core.db_connector.config_service import ConfigService
 
 class InstanceService:
     def __init__(self, config_service: ConfigService, connector_manager: ConnectorManager):
@@ -17,10 +17,7 @@ class InstanceService:
 
         for c_name in config_names:
             logger.info(f"InstanceService: Listing instances for config: {c_name}")
-            try:
-                instances = self.config_service.list_instances(c_name, no_cache=no_cache)
-                all_instances.extend(instances)
-                logger.info(f"InstanceService: Found {len(instances)} instances for config: {c_name}")
-            except Exception as e:
-                logger.warning(f"InstanceService: Could not list instances for config {c_name}: {e}")
+            instances = self.config_service.list_instances(c_name, no_cache=no_cache)
+            all_instances.extend(instances)
+            logger.info(f"InstanceService: Found {len(instances)} instances for config: {c_name}")
         return all_instances
