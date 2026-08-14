@@ -18,5 +18,7 @@ class DescribeTableRequest(BaseModel):
     table_name: Optional[str] = Field(default=None, description="Table name to describe.")
     generate_ai_docs: bool = Field(default=False, description="Generate AI documentation.")
     save_metadata: bool = Field(default=True, description="Persist generated metadata.")
-
-
+    only_if_changed: bool = Field(
+        default=False,
+        description="When save_metadata=True, skip writing if schema_description is unchanged. Preserves updated_at and avoids noise.",
+    )

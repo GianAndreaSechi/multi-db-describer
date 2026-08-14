@@ -21,6 +21,7 @@ class DescribeTableService:
         no_cache: bool = False,
         generate_ai_docs: bool = False,
         save_metadata: bool = True,
+        only_if_changed: bool = False,
     ) -> List[TableDescription]:
         all_table_descriptions = []
         config_names_to_process = [config_name] if config_name else self.config_service.get_available_configurations()
@@ -92,6 +93,7 @@ class DescribeTableService:
                                 table_name=tbl.name,
                                 schema_description=desc_dict,
                                 ai_documentation=ai_doc,
+                                only_if_changed=only_if_changed,
                             )
 
                         logger.info(f"DescribeTableService: Successfully described table: {tbl.name}")

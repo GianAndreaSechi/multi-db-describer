@@ -14,4 +14,3 @@ class ScanRequest(BaseModel):
         ),
     )
     save_metadata: bool = Field(default=True, description="Persist generated metadata.")
-

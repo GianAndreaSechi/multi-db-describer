@@ -1,6 +1,9 @@
+import sys
+
 from core.db_connector.connectors.mysql import MySQLConnector
+from core.db_connector.cache_manager import CacheManager
 from core.db_connector.models import TableDescription
-from loguru import logger # New import
+from loguru import logger
 
 # Configuration for MySQL Test (ADJUST THESE VALUES)
 MYSQL_CONFIG = {
@@ -15,7 +18,8 @@ def run_basic_mysql_test():
     logger.info("--- Running Basic MySQL Test ---")
     connector = None
     try:
-        connector = MySQLConnector(connection_params=MYSQL_CONFIG)
+        cache_manager = CacheManager()
+        connector = MySQLConnector(connection_params=MYSQL_CONFIG, cache_manager=cache_manager)
         logger.info("MySQL connection successful!")
 
         logger.info("\n--- Listing Instances ---")

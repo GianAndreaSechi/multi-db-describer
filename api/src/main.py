@@ -1,10 +1,14 @@
-from fastapi import FastAPI, HTTPException, Request, Header, Depends
+from fastapi import APIRouter, FastAPI, HTTPException, Request, Header, Depends
+from fastapi.responses import HTMLResponse
 from typing import Optional, Dict, Any, List
+from pathlib import Path
 from pydantic import BaseModel
 from loguru import logger
 from datetime import datetime, timezone
 import asyncio
 import os
+
+_UI_FILE = Path(__file__).parent / "static" / "index.html"
 
 from core.db_connector.manager import ConnectorManager
 from core.db_connector.models import (
@@ -27,6 +31,7 @@ from api.src.models.requests.scan_request import ScanRequest
 from api.src.services.response_service import api_response
 from api.src.services.scan_service import ScanService
 from core.db_connector.job_store import JobStore
+from api.src.routers.metadata_router import router as metadata_router
 
 app = FastAPI(
     title="Multi DB Describer API",
@@ -65,13 +70,18 @@ scan_service = ScanService(job_store)
 def get_no_cache_header(no_cache: Optional[str] = Header(None)) -> bool:
     return no_cache is not None and no_cache.lower() == "true"
 
-#start routing
-@app.get("/")
+# ---------------------------------------------------------------------------
+# v1 router — all business routes live here
+# ---------------------------------------------------------------------------
+
+v1 = APIRouter(prefix="/api/v1")
+
+@v1.get("/")
 async def read_root(http_request: Request):
     logger.info("Root endpoint accessed.")
     return api_response(http_request, "Welcome to the Multi-DB Connector API!", None)
 
-@app.get("/ping")
+@v1.get("/ping")
 async def ping(http_request: Request):
     logger.info("Ping endpoint accessed.")
     return api_response(
@@ -80,17 +90,16 @@ async def ping(http_request: Request):
         {"status": "success", "timestamp": datetime.now(timezone.utc).isoformat()},
     )
 
-@app.get("/configurations")
-async def get_available_configurations(http_request: Request, no_cache: bool = Depends(get_no_cache_header)): # Add no_cache
+@v1.get("/configurations")
+async def get_available_configurations(http_request: Request, no_cache: bool = Depends(get_no_cache_header)):
     """
     Get a list of all available database configurations.
     """
     logger.info("API: Fetching available configurations.")
-    # Caching for configurations is not implemented in core, so no_cache is not passed here
     data = config_service.get_available_configurations()
     return api_response(http_request, "Available configurations retrieved successfully.", data)
 
-@app.post("/connect")
+@v1.post("/connect")
 async def test_connection(req: ConnectionRequest, http_request: Request):
     """
     Test a connection to a specified database configuration.
@@ -109,8 +118,8 @@ async def test_connection(req: ConnectionRequest, http_request: Request):
         logger.exception(f"API: An unexpected error occurred during connection test for config: {req.config_name}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
-@app.post("/instances")
-async def list_instances_route(req: InstanceRequest, http_request: Request, no_cache: bool = Depends(get_no_cache_header)): # Add no_cache
+@v1.post("/instances")
+async def list_instances_route(req: InstanceRequest, http_request: Request, no_cache: bool = Depends(get_no_cache_header)):
     """
     List all instances (e.g., hosts for MySQL, database files for SQLite)
     for a given connector type. If no connector types are specified,
@@ -119,7 +128,7 @@ async def list_instances_route(req: InstanceRequest, http_request: Request, no_c
     logger.info(f"API: Listing instances for config name: {req.config_name}")
     try:
         config_names = [req.config_name] if req.config_name else None
-        data = instance_service.list_instances(config_names, no_cache=no_cache) # Pass no_cache
+        data = instance_service.list_instances(config_names, no_cache=no_cache)
         return api_response(http_request, "Instances retrieved successfully.", data)
     except ValueError as e:
         logger.error(f"API: Listing instances failed: {e}")
@@ -131,8 +140,8 @@ async def list_instances_route(req: InstanceRequest, http_request: Request, no_c
         logger.exception(f"API: An unexpected error occurred while listing instances for config name: {req.config_name}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
-@app.post("/schemas")
-async def list_schemas_route(req: SchemaRequest, http_request: Request, no_cache: bool = Depends(get_no_cache_header)): # Add no_cache
+@v1.post("/schemas")
+async def list_schemas_route(req: SchemaRequest, http_request: Request, no_cache: bool = Depends(get_no_cache_header)):
     """
     List all schemas (databases) for a given instance and configuration.
     If config_name is not specified, lists schemas for all available configurations.
@@ -140,7 +149,7 @@ async def list_schemas_route(req: SchemaRequest, http_request: Request, no_cache
     """
     logger.info(f"API: Listing schemas for config: {req.config_name if req.config_name else 'all'}, instance: {req.instance_name if req.instance_name else 'all'}")
     try:
-        data = schema_service.list_schemas(req.config_name, req.instance_name, no_cache=no_cache) # Pass no_cache
+        data = schema_service.list_schemas(req.config_name, req.instance_name, no_cache=no_cache)
         return api_response(http_request, "Schemas retrieved successfully.", data)
     except ValueError as e:
         logger.error(f"API: Listing schemas failed: {e}")
@@ -152,8 +161,8 @@ async def list_schemas_route(req: SchemaRequest, http_request: Request, no_cache
         logger.exception(f"API: An unexpected error occurred while listing schemas for config: {req.config_name}, instance: {req.instance_name}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
-@app.post("/tables")
-async def list_tables_route(req: TableRequest, http_request: Request, no_cache: bool = Depends(get_no_cache_header)): # Add no_cache
+@v1.post("/tables")
+async def list_tables_route(req: TableRequest, http_request: Request, no_cache: bool = Depends(get_no_cache_header)):
     """
     List all tables for a given schema, instance, and configuration.
     If config_name is not specified, lists tables for all available configurations.
@@ -162,7 +171,7 @@ async def list_tables_route(req: TableRequest, http_request: Request, no_cache: 
     """
     logger.info(f"API: Listing tables for config: {req.config_name if req.config_name else 'all'}, instance: {req.instance_name if req.instance_name else 'all'}, schema: {req.schema_name if req.schema_name else 'all'}, limit: {req.limit if req.limit else 'none'}, offset: {req.offset if req.offset else 'none'}")
     try:
-        data = table_service.list_tables(req.config_name, req.instance_name, req.schema_name, req.limit, req.offset, no_cache=no_cache) # Pass no_cache
+        data = table_service.list_tables(req.config_name, req.instance_name, req.schema_name, req.limit, req.offset, no_cache=no_cache)
         return api_response(http_request, "Tables retrieved successfully.", data)
     except ValueError as e:
         logger.error(f"API: Listing tables failed: {e}")
@@ -174,8 +183,8 @@ async def list_tables_route(req: TableRequest, http_request: Request, no_cache: 
         logger.exception(f"API: An unexpected error occurred while listing tables for config: {req.config_name}, instance: {req.instance_name}, schema: {req.schema_name}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
-@app.post("/describe")
-async def describe_table_route(req: DescribeTableRequest, http_request: Request, no_cache: bool = Depends(get_no_cache_header)): # Add no_cache
+@v1.post("/describe")
+async def describe_table_route(req: DescribeTableRequest, http_request: Request, no_cache: bool = Depends(get_no_cache_header)):
     """
     Get a detailed description of a specific table, including columns,
     primary keys, foreign keys, and other indexes.
@@ -201,6 +210,7 @@ async def describe_table_route(req: DescribeTableRequest, http_request: Request,
             no_cache=no_cache,
             generate_ai_docs=req.generate_ai_docs,
             save_metadata=req.save_metadata,
+            only_if_changed=req.only_if_changed,
         )
         return api_response(http_request, "Table description retrieved successfully.", data)
     except ValueError as e:
@@ -218,7 +228,7 @@ async def describe_table_route(req: DescribeTableRequest, http_request: Request,
 # Async scan endpoints
 # ---------------------------------------------------------------------------
 
-@app.post("/scan", status_code=202)
+@v1.post("/scan", status_code=202)
 async def enqueue_scan(req: ScanRequest, http_request: Request, no_cache: bool = Depends(get_no_cache_header)):
     """
     Enqueue an async scan job.
@@ -254,7 +264,7 @@ async def enqueue_scan(req: ScanRequest, http_request: Request, no_cache: bool =
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
 
-@app.get("/scan/{job_id}")
+@v1.get("/scan/{job_id}")
 async def get_scan_job(job_id: str, http_request: Request, include_results: bool = False):
     """
     Get the status (and optionally results) of a scan job.
@@ -277,7 +287,7 @@ async def get_scan_job(job_id: str, http_request: Request, include_results: bool
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
 
-@app.get("/scans")
+@v1.get("/scans")
 async def list_scan_jobs(http_request: Request, limit: int = 50):
     """
     List recent scan jobs (newest first, no results payload).
@@ -292,6 +302,15 @@ async def list_scan_jobs(http_request: Request, limit: int = 50):
     except Exception as e:
         logger.exception("API: Unexpected error listing scan jobs")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+
+
+v1.include_router(metadata_router)
+app.include_router(v1)
+
+
+@app.get("/ui", response_class=HTMLResponse, include_in_schema=False)
+async def serve_ui():
+    return _UI_FILE.read_text(encoding="utf-8")
 
 
 if __name__ == "__main__":

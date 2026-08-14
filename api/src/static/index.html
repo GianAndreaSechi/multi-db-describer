@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Metadata Explorer</title>
+  <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #f8fafc;
+      --surface:      #ffffff;
+      --sidebar-bg:   #f1f5f9;
+      --border:       #e2e8f0;
+      --text:         #0f172a;
+      --text-muted:   #64748b;
+      --text-light:   #94a3b8;
+      --accent:       #3b82f6;
+      --accent-dark:  #2563eb;
+      --accent-bg:    #eff6ff;
+      --success:      #16a34a;
+      --success-bg:   #f0fdf4;
+      --success-bdr:  #bbf7d0;
+      --warn:         #d97706;
+      --warn-bg:      #fffbeb;
+      --warn-bdr:     #fde68a;
+      --error:        #dc2626;
+      --error-bg:     #fef2f2;
+      --error-bdr:    #fecaca;
+      --header-bg:    #0f172a;
+      --panel-head:   #e2e8f0;
+      --item-hover:   #e8f0fe;
+      --item-active:  #3b82f6;
+      --item-active-t:#ffffff;
+      --radius:       6px;
+      --font:         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --mono:         'SF Mono', 'Fira Code', Consolas, 'Courier New', monospace;
+    }
+
+    body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+    #root { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── Header ── */
+    .hdr {
+      height: 48px; background: var(--header-bg); color: #fff;
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 20px; flex-shrink: 0;
+    }
+    .hdr-logo { font-size: 18px; }
+    .hdr-title { font-size: 15px; font-weight: 600; letter-spacing: -.2px; }
+    .hdr-divider { width: 1px; height: 18px; background: rgba(255,255,255,.15); margin: 0 4px; }
+    .hdr-bc { display: flex; align-items: center; gap: 5px; font-size: 12px; color: rgba(255,255,255,.5); }
+    .hdr-bc-link { cursor: pointer; padding: 2px 4px; border-radius: 3px; transition: color .1s; }
+    .hdr-bc-link:hover { color: #fff; background: rgba(255,255,255,.1); }
+    .hdr-bc-cur { color: rgba(255,255,255,.85); }
+    .hdr-bc-sep { color: rgba(255,255,255,.25); }
+    .hdr-refresh {
+      margin-left: auto; background: none; border: 1px solid rgba(255,255,255,.2);
+      color: rgba(255,255,255,.6); padding: 4px 10px; border-radius: var(--radius);
+      font-size: 12px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 5px;
+    }
+    .hdr-refresh:hover { background: rgba(255,255,255,.1); color: #fff; }
+    .spin { display: inline-block; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Layout ── */
+    .layout { flex: 1; display: flex; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 264px; min-width: 264px;
+      background: var(--sidebar-bg); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    /* ── Nav panel ── */
+    .npanel { display: flex; flex-direction: column; flex: 1; min-height: 0; border-bottom: 1px solid var(--border); }
+    .npanel:last-child { border-bottom: none; }
+    .npanel--dim { opacity: .45; pointer-events: none; }
+
+    .npanel-head {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 8px 6px 12px; background: var(--panel-head); flex-shrink: 0;
+    }
+    .npanel-icon { font-size: 11px; color: var(--text-muted); }
+    .npanel-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted); flex: 1; }
+    .npanel-count { font-size: 10px; font-weight: 600; color: var(--accent); background: var(--accent-bg); padding: 1px 6px; border-radius: 10px; }
+    .npanel-scan-btn {
+      background: none; border: 1px solid var(--border); color: var(--text-muted);
+      border-radius: 4px; padding: 2px 7px; font-size: 10px; cursor: pointer;
+      display: flex; align-items: center; gap: 3px; transition: all .15s; white-space: nowrap;
+    }
+    .npanel-scan-btn:hover:not(:disabled) { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+    .npanel-scan-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .npanel-scan-btn--running { border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
+
+    /* ── Search ── */
+    .srch { padding: 6px 8px; flex-shrink: 0; position: relative; }
+    .srch-input { width: 100%; padding: 5px 26px 5px 26px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; background: var(--surface); color: var(--text); outline: none; transition: border-color .15s; }
+    .srch-input:focus { border-color: var(--accent); }
+    .srch-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-light); font-size: 13px; pointer-events: none; }
+    .srch-clear { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-light); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
+    .srch-clear:hover { color: var(--text); }
+
+    /* ── Nav list ── */
+    .nlist { overflow-y: auto; flex: 1; padding: 3px 6px 6px; }
+    .nlist-empty { padding: 10px 6px; font-size: 12px; color: var(--text-light); text-align: center; font-style: italic; }
+    .nlist-err { margin: 4px 0; padding: 6px 8px; font-size: 11px; color: var(--error); background: var(--error-bg); border: 1px solid var(--error-bdr); border-radius: 4px; }
+    .nitem { padding: 6px 10px; border-radius: var(--radius); cursor: pointer; font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none; transition: background .1s, color .1s; }
+    .nitem:hover { background: var(--item-hover); }
+    .nitem--on { background: var(--item-active) !important; color: var(--item-active-t) !important; font-weight: 500; }
+
+    /* ── Scan status bar ── */
+    .scan-bar {
+      flex-shrink: 0; padding: 7px 20px; border-top: 1px solid var(--border);
+      background: var(--warn-bg); display: flex; align-items: center; gap: 10px;
+      font-size: 12px; color: var(--warn);
+    }
+    .scan-bar--done  { background: var(--success-bg); color: var(--success); border-color: var(--success-bdr); }
+    .scan-bar--error { background: var(--error-bg);   color: var(--error);   border-color: var(--error-bdr); }
+    .scan-bar-msg { flex: 1; }
+    .scan-bar-dismiss { background: none; border: none; cursor: pointer; color: inherit; font-size: 16px; line-height: 1; padding: 0 2px; opacity: .7; }
+    .scan-bar-dismiss:hover { opacity: 1; }
+
+    /* ── Main ── */
+    .main { flex: 1; overflow: hidden; display: flex; flex-direction: column; background: var(--surface); position: relative; }
+
+    /* ── Empty state ── */
+    .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+    .empty-icon { font-size: 38px; opacity: .35; }
+    .empty-text { font-size: 14px; color: var(--text-muted); }
+
+    /* ── Loading overlay ── */
+    .overlay { position: absolute; inset: 0; background: rgba(255,255,255,.75); display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--text-muted); z-index: 10; }
+    .loader { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid var(--border); border-top-color: var(--accent); animation: spin .65s linear infinite; }
+
+    /* ── Detail panel ── */
+    .detail { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+    .detail-hdr { display: flex; align-items: flex-start; justify-content: space-between; padding: 14px 20px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; gap: 12px; }
+    .detail-title { font-size: 15px; font-weight: 600; margin-bottom: 5px; }
+    .detail-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
+    .detail-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+
+    /* ── Buttons ── */
+    .btn { padding: 6px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: background .15s, opacity .15s; white-space: nowrap; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-dark); }
+    .btn-secondary { background: none; color: var(--text-muted); border: 1px solid var(--border); }
+    .btn-secondary:hover:not(:disabled) { background: var(--bg); color: var(--text); }
+    .btn-ghost { background: none; color: var(--text-muted); border: 1px solid var(--border); }
+    .btn-ghost:hover:not(:disabled) { background: var(--bg); color: var(--text); }
+
+    /* ── Alerts ── */
+    .alert { margin: 8px 20px 0; padding: 8px 12px; border-radius: var(--radius); font-size: 12px; flex-shrink: 0; }
+    .alert-ok   { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-bdr); }
+    .alert-warn { background: var(--warn-bg);    color: var(--warn);    border: 1px solid var(--warn-bdr); }
+    .alert-err  { background: var(--error-bg);   color: var(--error);   border: 1px solid var(--error-bdr); }
+
+    /* ── JSON view ── */
+    .view-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 14px 20px 16px; }
+    .json-pre { flex: 1; overflow: auto; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; font-family: var(--mono); font-size: 12.5px; line-height: 1.75; color: var(--text); white-space: pre; word-break: normal; }
+    .jk { color: #7c3aed; } .js { color: #16a34a; } .jn { color: #dc2626; } .jb { color: #2563eb; } .jz { color: #9ca3af; }
+
+    /* ── Editor ── */
+    .edit-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 12px 20px 0; gap: 8px; }
+    .json-err-msg { font-size: 11px; color: var(--error); background: var(--error-bg); border: 1px solid var(--error-bdr); border-radius: 4px; padding: 5px 10px; flex-shrink: 0; }
+    .json-ta { flex: 1; font-family: var(--mono); font-size: 12.5px; line-height: 1.75; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: var(--radius); resize: none; outline: none; background: var(--surface); color: var(--text); transition: border-color .15s; min-height: 0; }
+    .json-ta:focus { border-color: var(--accent); }
+    .json-ta--inv { border-color: var(--error); }
+    .edit-hint { font-size: 11px; color: var(--text-light); padding: 6px 0 14px; flex-shrink: 0; line-height: 1.6; }
+    .edit-hint code { font-family: var(--mono); background: var(--bg); padding: 1px 4px; border-radius: 3px; font-size: 10px; color: var(--text-muted); border: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const API      = '/api/v1';
+const PAGE_SZ  = 200;
+const POLL_MS  = 2500;
+const PROTECTED = new Set(['metadata_key','config_name','instance_name','schema_name','table_name','updated_at']);
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+
+async function apiFetch(path) {
+  const r = await fetch(API + path, { headers: { Accept: 'application/json' } });
+  if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail || `HTTP ${r.status}`); }
+  return (await r.json()).data;
+}
+
+async function apiPost(path, body) {
+  const r = await fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail || `HTTP ${r.status}`); }
+  return (await r.json()).data;
+}
+
+async function apiPatch(path, body) {
+  const r = await fetch(API + path, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail || `HTTP ${r.status}`); }
+  return (await r.json()).data;
+}
+
+function highlight(str) {
+  const esc = str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return esc.replace(
+    /("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    m => {
+      if (/^"/.test(m)) return /:$/.test(m) ? `<span class="jk">${m}</span>` : `<span class="js">${m}</span>`;
+      if (/true|false/.test(m)) return `<span class="jb">${m}</span>`;
+      if (/null/.test(m)) return `<span class="jz">${m}</span>`;
+      return `<span class="jn">${m}</span>`;
+    }
+  );
+}
+
+// ── SearchBox ─────────────────────────────────────────────────────────────────
+
+function SearchBox({ value, onChange }) {
+  return (
+    <div className="srch">
+      <span className="srch-icon">⌕</span>
+      <input className="srch-input" type="text" value={value} onChange={e => onChange(e.target.value)} placeholder="Cerca…" />
+      {value && <button className="srch-clear" onClick={() => onChange('')}>×</button>}
+    </div>
+  );
+}
+
+// ── NavPanel ──────────────────────────────────────────────────────────────────
+
+function NavPanel({ title, icon, items, selected, onSelect, filter, onFilter,
+                    loading, error, disabled, scanLabel, onScan, scanning }) {
+  const filtered = (items || []).filter(i => i.toLowerCase().includes(filter.toLowerCase()));
+  return (
+    <div className={`npanel${disabled ? ' npanel--dim' : ''}`}>
+      <div className="npanel-head">
+        <span className="npanel-icon">{icon}</span>
+        <span className="npanel-title">{title}</span>
+        {loading
+          ? <span className="spin" style={{fontSize:12,color:'var(--text-light)'}}>↻</span>
+          : <span className="npanel-count">{filtered.length}</span>}
+        {onScan && selected && (
+          <button
+            className={`npanel-scan-btn${scanning ? ' npanel-scan-btn--running' : ''}`}
+            onClick={onScan}
+            disabled={scanning}
+            title={scanning ? 'Scan in corso…' : scanLabel}
+          >
+            {scanning ? <><span className="spin">↻</span> In corso</> : <>▷ Scan</>}
+          </button>
+        )}
+      </div>
+      {!disabled && <>
+        <SearchBox value={filter} onChange={onFilter} />
+        <ul className="nlist">
+          {error && <li className="nlist-err">⚠ {error}</li>}
+          {!error && !loading && filtered.length === 0 && <li className="nlist-empty">{filter ? 'Nessun risultato' : 'Vuoto'}</li>}
+          {filtered.map(item => (
+            <li key={item} className={`nitem${selected === item ? ' nitem--on' : ''}`}
+              onClick={() => onSelect(item)} title={item}>{item}</li>
+          ))}
+        </ul>
+      </>}
+    </div>
+  );
+}
+
+// ── Breadcrumb ────────────────────────────────────────────────────────────────
+
+function Breadcrumb({ inst, db, tbl, onInst, onDb }) {
+  if (!inst) return null;
+  return (
+    <div className="hdr-bc">
+      <span className="hdr-bc-link" onClick={onInst}>{inst}</span>
+      {db  && <><span className="hdr-bc-sep">›</span><span className="hdr-bc-link" onClick={onDb}>{db}</span></>}
+      {tbl && <><span className="hdr-bc-sep">›</span><span className="hdr-bc-cur">{tbl}</span></>}
+    </div>
+  );
+}
+
+// ── ScanStatusBar ─────────────────────────────────────────────────────────────
+
+function ScanStatusBar({ scan, onDismiss }) {
+  if (!scan) return null;
+  const cls = scan.status === 'completed' ? 'scan-bar--done'
+            : scan.status === 'failed'    ? 'scan-bar--error'
+            : '';
+  const icon = scan.status === 'completed' ? '✓'
+             : scan.status === 'failed'    ? '✗'
+             : <span className="spin">↻</span>;
+  return (
+    <div className={`scan-bar ${cls}`}>
+      <span>{icon}</span>
+      <span className="scan-bar-msg">
+        <strong>Scan {scan.status}</strong>
+        {scan.jobId && <span style={{opacity:.7}}> · job {scan.jobId.slice(0,8)}…</span>}
+        {scan.result_count != null && <span style={{opacity:.7}}> · {scan.result_count} tabelle</span>}
+        {scan.error && <span> — {scan.error}</span>}
+      </span>
+      {(scan.status === 'completed' || scan.status === 'failed') &&
+        <button className="scan-bar-dismiss" onClick={onDismiss}>×</button>}
+    </div>
+  );
+}
+
+// ── DetailPanel ───────────────────────────────────────────────────────────────
+
+function DetailPanel({ inst, db, tbl, detail, onSaved, onReload }) {
+  const [editing, setEditing]       = useState(false);
+  const [text, setText]             = useState('');
+  const [jsonErr, setJsonErr]       = useState('');
+  const [saveStatus, setSaveStatus] = useState(null);   // null | saving | ok | warn | err
+  const [saveMsg, setSaveMsg]       = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const taRef = useRef(null);
+
+  useEffect(() => { setEditing(false); setJsonErr(''); setSaveStatus(null); }, [inst, db, tbl]);
+
+  function startEdit() {
+    setText(JSON.stringify(detail, null, 2)); setJsonErr(''); setSaveStatus(null); setSaveMsg('');
+    setEditing(true);
+    setTimeout(() => taRef.current?.focus(), 30);
+  }
+
+  function handleChange(val) {
+    setText(val);
+    try { JSON.parse(val); setJsonErr(''); } catch (e) { setJsonErr(e.message); }
+  }
+
+  function handleTab(e) {
+    if (e.key !== 'Tab') return;
+    e.preventDefault();
+    const s = e.target.selectionStart, en = e.target.selectionEnd;
+    const next = text.slice(0, s) + '  ' + text.slice(en);
+    setText(next);
+    requestAnimationFrame(() => { if (taRef.current) taRef.current.selectionStart = taRef.current.selectionEnd = s + 2; });
+  }
+
+  async function handleSave() {
+    let parsed;
+    try { parsed = JSON.parse(text); } catch (e) { setJsonErr(e.message); return; }
+    const payload = Object.fromEntries(Object.entries(parsed).filter(([k]) => !PROTECTED.has(k)));
+    if (!Object.keys(payload).length) { setSaveStatus('err'); setSaveMsg('Nessun campo modificabile.'); return; }
+    setSaveStatus('saving');
+    try {
+      const updated = await apiPatch(`/metadata/${inst}/${db}/${tbl}`, payload);
+      onSaved(updated); setEditing(false); setSaveStatus('ok');
+      setTimeout(() => setSaveStatus(null), 3000);
+    } catch (e) { setSaveStatus('err'); setSaveMsg(e.message); }
+  }
+
+  async function handleRefreshSchema() {
+    if (!detail?.config_name) return;
+    setRefreshing(true); setSaveStatus(null);
+    try {
+      await apiPost('/describe', {
+        config_name:     detail.config_name,
+        instance_name:   detail.instance_name,
+        schema_name:     detail.schema_name,
+        table_name:      detail.table_name,
+        save_metadata:   true,
+        only_if_changed: true,
+        generate_ai_docs: false,
+      });
+      const updated = await apiFetch(`/metadata/${inst}/${db}/${tbl}`);
+      if (updated._unchanged) {
+        setSaveStatus('warn'); setSaveMsg('Schema invariato, nessuna modifica salvata.');
+      } else {
+        onSaved(updated); setSaveStatus('ok'); setSaveMsg('Schema aggiornato dal database live.');
+      }
+      setTimeout(() => setSaveStatus(null), 4000);
+    } catch (e) {
+      setSaveStatus('err'); setSaveMsg(e.message);
+    } finally { setRefreshing(false); }
+  }
+
+  return (
+    <div className="detail">
+      <div className="detail-hdr">
+        <div>
+          <div className="detail-title">{tbl}</div>
+          <div className="detail-badges">
+            {detail.config_name && <span className="badge">⚙ {detail.config_name}</span>}
+            {detail.updated_at  && <span className="badge">🕐 {new Date(detail.updated_at).toLocaleString('it-IT')}</span>}
+          </div>
+        </div>
+        <div className="detail-actions">
+          {!editing ? (
+            <>
+              <button className="btn btn-secondary" onClick={handleRefreshSchema} disabled={refreshing || !detail.config_name}
+                title={detail.config_name ? 'Ri-descrive la tabella dal database live e aggiorna lo schema se cambiato' : 'config_name non disponibile'}>
+                {refreshing ? <><span className="spin">↻</span> Aggiornamento…</> : '↺ Aggiorna schema'}
+              </button>
+              <button className="btn btn-primary" onClick={startEdit}>Modifica</button>
+            </>
+          ) : (
+            <>
+              <button className="btn btn-ghost" onClick={() => setEditing(false)} disabled={saveStatus === 'saving'}>Annulla</button>
+              <button className="btn btn-primary" onClick={handleSave} disabled={!!jsonErr || saveStatus === 'saving'}>
+                {saveStatus === 'saving' ? 'Salvataggio…' : 'Salva'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {saveStatus === 'ok'   && <div className="alert alert-ok" >✓ {saveMsg || 'Salvato con successo'}</div>}
+      {saveStatus === 'warn' && <div className="alert alert-warn">⚠ {saveMsg}</div>}
+      {saveStatus === 'err'  && <div className="alert alert-err" >✗ {saveMsg}</div>}
+
+      {editing ? (
+        <div className="edit-body">
+          {jsonErr && <div className="json-err-msg">JSON non valido — {jsonErr}</div>}
+          <textarea ref={taRef} className={`json-ta${jsonErr ? ' json-ta--inv' : ''}`}
+            value={text} onChange={e => handleChange(e.target.value)}
+            onKeyDown={handleTab} spellCheck={false} autoCorrect="off" autoCapitalize="off" />
+          <p className="edit-hint">
+            Campi protetti (non modificabili):&nbsp;
+            {[...PROTECTED].map((f, i) => (
+              <React.Fragment key={f}><code>{f}</code>{i < PROTECTED.size - 1 ? ' · ' : ''}</React.Fragment>
+            ))}
+          </p>
+        </div>
+      ) : (
+        <div className="view-body">
+          <pre className="json-pre" dangerouslySetInnerHTML={{ __html: highlight(JSON.stringify(detail, null, 2)) }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── EmptyState ────────────────────────────────────────────────────────────────
+
+function EmptyState({ inst, db }) {
+  const [icon, msg] = !inst ? ['🗂', "Seleziona un'istanza per iniziare"]
+    : !db ? ['🗄', 'Seleziona un database']
+    : ['📋', 'Seleziona una tabella per vederne i metadati'];
+  return <div className="empty"><div className="empty-icon">{icon}</div><div className="empty-text">{msg}</div></div>;
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
+
+function App() {
+  const [instances, setInstances] = useState([]);
+  const [databases, setDatabases] = useState([]);
+  const [tables,    setTables]    = useState([]);
+  const [selInst,   setSelInst]   = useState(null);
+  const [selDb,     setSelDb]     = useState(null);
+  const [selTbl,    setSelTbl]    = useState(null);
+  const [detail,    setDetail]    = useState(null);
+  const [filters,   setFilters]   = useState({ inst: '', db: '', tbl: '' });
+  const [loading,   setLoading]   = useState({ inst: false, db: false, tbl: false, detail: false });
+  const [errors,    setErrors]    = useState({ inst: null, db: null, tbl: null });
+
+  // Scan state: { jobId, status, level, result_count, error } | null
+  const [activeScan, setActiveScan] = useState(null);
+  const [scanningInst, setScanningInst] = useState(false);
+  const [scanningDb,   setScanningDb]   = useState(false);
+  const pollRef = useRef(null);
+
+  const setLoad = (k, v) => setLoading(l => ({ ...l, [k]: v }));
+  const setErr  = (k, v) => setErrors(e  => ({ ...e, [k]: v }));
+
+  // ── Poll scan job ──────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!activeScan?.jobId) return;
+    const terminal = ['completed', 'partial', 'failed'];
+    if (terminal.includes(activeScan.status)) { clearInterval(pollRef.current); return; }
+
+    pollRef.current = setInterval(async () => {
+      try {
+        const data = await apiFetch(`/scan/${activeScan.jobId}`);
+        setActiveScan(s => ({ ...s, status: data.status, result_count: data.result_count, error: data.error }));
+        if (terminal.includes(data.status)) {
+          clearInterval(pollRef.current);
+          setScanningInst(false); setScanningDb(false);
+        }
+      } catch { clearInterval(pollRef.current); setScanningInst(false); setScanningDb(false); }
+    }, POLL_MS);
+
+    return () => clearInterval(pollRef.current);
+  }, [activeScan?.jobId]);
+
+  // ── Scan triggers ──────────────────────────────────────────────────────────
+
+  async function triggerScan(instance_name, schema_name, level) {
+    const setScanning = level === 'inst' ? setScanningInst : setScanningDb;
+    setScanning(true);
+    setActiveScan({ jobId: null, status: 'pending', level, result_count: null, error: null });
+    try {
+      const payload = { instance_name, generate_ai_docs: false, save_metadata: true };
+      if (schema_name) payload.schema_name = schema_name;
+      const data = await apiPost('/scan', payload);
+      setActiveScan(s => ({ ...s, jobId: data.job_id, status: data.status }));
+    } catch (e) {
+      setActiveScan(s => ({ ...s, status: 'failed', error: e.message }));
+      setScanning(false);
+    }
+  }
+
+  // ── Data loading ───────────────────────────────────────────────────────────
+
+  function loadInstances() {
+    setLoad('inst', true); setErr('inst', null);
+    apiFetch(`/metadata?page_size=${PAGE_SZ}`)
+      .then(d => setInstances(d.items || []))
+      .catch(e => setErr('inst', e.message))
+      .finally(() => setLoad('inst', false));
+  }
+
+  useEffect(loadInstances, []);
+
+  function selectInstance(inst) {
+    setSelInst(inst); setSelDb(null); setSelTbl(null); setDetail(null);
+    setDatabases([]); setTables([]);
+    setFilters(f => ({ ...f, db: '', tbl: '' }));
+    setLoad('db', true); setErr('db', null);
+    apiFetch(`/metadata/${encodeURIComponent(inst)}?page_size=${PAGE_SZ}`)
+      .then(d => setDatabases(d.items || []))
+      .catch(e => setErr('db', e.message))
+      .finally(() => setLoad('db', false));
+  }
+
+  function selectDatabase(db) {
+    setSelDb(db); setSelTbl(null); setDetail(null); setTables([]);
+    setFilters(f => ({ ...f, tbl: '' }));
+    setLoad('tbl', true); setErr('tbl', null);
+    apiFetch(`/metadata/${encodeURIComponent(selInst)}/${encodeURIComponent(db)}?page_size=${PAGE_SZ}`)
+      .then(d => setTables(d.items || []))
+      .catch(e => setErr('tbl', e.message))
+      .finally(() => setLoad('tbl', false));
+  }
+
+  function selectTable(tbl) {
+    setSelTbl(tbl); setDetail(null);
+    setLoad('detail', true);
+    apiFetch(`/metadata/${encodeURIComponent(selInst)}/${encodeURIComponent(selDb)}/${encodeURIComponent(tbl)}`)
+      .then(d => setDetail(d))
+      .catch(() => setDetail(null))
+      .finally(() => setLoad('detail', false));
+  }
+
+  function clearInstance() { setSelInst(null); setSelDb(null); setSelTbl(null); setDetail(null); setDatabases([]); setTables([]); }
+  function clearDatabase()  { setSelDb(null); setSelTbl(null); setDetail(null); setTables([]); }
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
+      <header className="hdr">
+        <span className="hdr-logo">◈</span>
+        <span className="hdr-title">Metadata Explorer</span>
+        {selInst && <><div className="hdr-divider"/><Breadcrumb inst={selInst} db={selDb} tbl={selTbl} onInst={clearInstance} onDb={clearDatabase}/></>}
+        <button className="hdr-refresh" onClick={loadInstances} title="Ricarica istanze">
+          <span className={loading.inst ? 'spin' : ''}>↺</span> Aggiorna
+        </button>
+      </header>
+
+      <div className="layout">
+        <aside className="sidebar">
+          <NavPanel title="Istanze" icon="⬡"
+            items={instances} selected={selInst} onSelect={selectInstance}
+            filter={filters.inst} onFilter={v => setFilters(f => ({ ...f, inst: v }))}
+            loading={loading.inst} error={errors.inst}
+            scanLabel={`Scan istanza ${selInst}`}
+            onScan={selInst ? () => triggerScan(selInst, null, 'inst') : null}
+            scanning={scanningInst} />
+          <NavPanel title="Database" icon="▤"
+            items={databases} selected={selDb} onSelect={selectDatabase}
+            filter={filters.db} onFilter={v => setFilters(f => ({ ...f, db: v }))}
+            loading={loading.db} error={errors.db} disabled={!selInst}
+            scanLabel={`Scan database ${selDb}`}
+            onScan={selDb ? () => triggerScan(selInst, selDb, 'db') : null}
+            scanning={scanningDb} />
+          <NavPanel title="Tabelle" icon="▦"
+            items={tables} selected={selTbl} onSelect={selectTable}
+            filter={filters.tbl} onFilter={v => setFilters(f => ({ ...f, tbl: v }))}
+            loading={loading.tbl} error={errors.tbl} disabled={!selDb} />
+        </aside>
+
+        <main className="main">
+          {selTbl && detail
+            ? <DetailPanel key={`${selInst}/${selDb}/${selTbl}`}
+                inst={selInst} db={selDb} tbl={selTbl}
+                detail={detail} onSaved={setDetail} />
+            : <EmptyState inst={selInst} db={selDb} />}
+          {loading.detail && !detail && <div className="overlay"><div className="loader" /> Caricamento…</div>}
+          <ScanStatusBar scan={activeScan} onDismiss={() => { setActiveScan(null); setScanningInst(false); setScanningDb(false); }} />
+        </main>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
