@@ -99,7 +99,7 @@ Copy `.env.example` to `.env`.
 | `REDIS_PORT` | `6379` | Redis port |
 | `REDIS_DB` | `0` | Redis database index |
 | `REDIS_TTL_SECONDS` | `86400` | Introspection cache TTL (1 day) |
-| `CACHE_KEY_PREFIX` | `multi-db-connector` | Redis key prefix (must match Worker) |
+| `CACHE_KEY_PREFIX` | `irides` | Redis key prefix (must match Worker) |
 | `DB_CONFIG_FILE` | *(none)* | Optional explicit path to `.env` file for Docker container |
 | `DB_TARGETS` | *(none)* | Comma-separated list of named DB targets |
 | `SCAN_RESULTS_TTL_SECONDS` | `604800` | Scan job/result retention in Redis (7 days) |
