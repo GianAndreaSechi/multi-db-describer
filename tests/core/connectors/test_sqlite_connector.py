@@ -1,9 +1,15 @@
 import pytest
 import sqlite3
-import os
 from core.db_connector.connectors.sqlite import SQLiteConnector
-from core.db_connector.models import Instance, Schema, Table, Column
-from loguru import logger # New import
+from loguru import logger
+
+
+class DummyCacheManager:
+    def get_cached_data(self, key, no_cache=False):
+        return None
+
+    def set_cached_data(self, key, data, ttl=None):
+        pass
 
 @pytest.fixture
 def sqlite_db_path(tmp_path):
@@ -40,7 +46,10 @@ def sqlite_db_path(tmp_path):
 def sqlite_connector(sqlite_db_path):
     """Fixture to provide an initialized SQLiteConnector."""
     logger.info(f"Initializing SQLiteConnector for database: {sqlite_db_path}")
-    return SQLiteConnector(connection_params={"database": sqlite_db_path})
+    return SQLiteConnector(
+        connection_params={"database": sqlite_db_path},
+        cache_manager=DummyCacheManager(),
+    )
 
 def test_sqlite_get_type():
     assert SQLiteConnector.get_type() == "sqlite"
@@ -66,9 +75,10 @@ def test_sqlite_list_tables(sqlite_connector, sqlite_db_path):
     assert all(t.schema_name == "main" for t in tables)
 
 def test_sqlite_describe_table_users(sqlite_connector, sqlite_db_path):
-    columns = sqlite_connector.describe_table(
+    table_desc = sqlite_connector.describe_table(
         instance_name=sqlite_db_path, schema_name="main", table_name="users"
     )
+    columns = table_desc.columns
     assert len(columns) == 3
     
     col_names = {c.name for c in columns}
@@ -89,9 +99,10 @@ def test_sqlite_describe_table_users(sqlite_connector, sqlite_db_path):
     assert email_col.is_nullable # UNIQUE constraint doesn't imply NOT NULL unless specified
 
 def test_sqlite_describe_table_products(sqlite_connector, sqlite_db_path):
-    columns = sqlite_connector.describe_table(
+    table_desc = sqlite_connector.describe_table(
         instance_name=sqlite_db_path, schema_name="main", table_name="products"
     )
+    columns = table_desc.columns
     assert len(columns) == 3
     
     col_names = {c.name for c in columns}

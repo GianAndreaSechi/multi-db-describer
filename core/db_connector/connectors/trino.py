@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 from core.db_connector.interface import BaseConnector
 from core.db_connector.models import Instance, Schema, Table, Column, TableDescription
 from core.db_connector.models.table_details import Partition
+from core.db_connector.sql_utils import quote_identifier, quote_sql_string, validate_limit_offset
 from loguru import logger
 from ..cache_manager import CacheManager
 
@@ -124,7 +125,7 @@ class TrinoConnector(BaseConnector):
         if cached_data:
             return [Schema(**d) for d in cached_data]
 
-        rows = self._execute_query(f"SHOW SCHEMAS FROM {instance_name}")
+        rows = self._execute_query(f"SHOW SCHEMAS FROM {quote_identifier(instance_name)}")
         col = list(rows[0].keys())[0] if rows else "Schema"
         schemas = [Schema(name=row[col]) for row in rows]
 
@@ -143,6 +144,7 @@ class TrinoConnector(BaseConnector):
         offset: Optional[int] = None,
         no_cache: bool = False,
     ) -> List[Table]:
+        limit, offset = validate_limit_offset(limit, offset)
         cache_key = f"trino_tables:{self.host}:{self.port}:{instance_name}:{schema_name}:{limit}:{offset}"
         cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
         if cached_data:
@@ -150,8 +152,8 @@ class TrinoConnector(BaseConnector):
 
         query = f"""
             SELECT table_name
-            FROM {instance_name}.information_schema.tables
-            WHERE table_schema = '{schema_name}'
+            FROM {quote_identifier(instance_name)}.information_schema.tables
+            WHERE table_schema = {quote_sql_string(schema_name)}
             ORDER BY table_name
         """
         if offset is not None:
@@ -189,9 +191,9 @@ class TrinoConnector(BaseConnector):
                 column_default,
                 comment,
                 extra_info
-            FROM {instance_name}.information_schema.columns
-            WHERE table_schema = '{schema_name}'
-              AND table_name   = '{table_name}'
+            FROM {quote_identifier(instance_name)}.information_schema.columns
+            WHERE table_schema = {quote_sql_string(schema_name)}
+              AND table_name   = {quote_sql_string(table_name)}
             ORDER BY ordinal_position
         """
         rows = self._execute_query(query)

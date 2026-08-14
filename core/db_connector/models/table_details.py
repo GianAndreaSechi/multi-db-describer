@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
 # Assuming core.db_connector.models.column.Column already exists
@@ -46,3 +46,6 @@ class TableDescription(BaseModel):
     foreign_keys: List[ForeignKey] = []
     indexes: List[Index] = []
     partitions: List[Partition] = []
+    ai_documentation: Optional[Dict[str, Any]] = None
+    ai_generation_status: Optional[str] = None
+    ai_generation_error: Optional[str] = None

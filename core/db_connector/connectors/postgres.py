@@ -1,10 +1,12 @@
 import psycopg2
 import psycopg2.pool
 import psycopg2.extras
+import hashlib
 from typing import List, Dict, Any, Optional
 from core.db_connector.interface import BaseConnector
 from core.db_connector.models import Instance, Schema, Table, Column, PrimaryKey, ForeignKey, Index, TableDescription
 from core.db_connector.models.table_details import Partition
+from core.db_connector.sql_utils import validate_limit_offset
 from loguru import logger
 from ..cache_manager import CacheManager
 
@@ -52,7 +54,8 @@ class PostgreSQLConnector(BaseConnector):
                 "PostgreSQL connector requires 'host', 'user', 'password', and 'database' in connection_params."
             )
 
-        pool_key = f"{self.host}:{self.port}:{self.user}:{self.database}"
+        password_fingerprint = hashlib.sha256((self.password or "").encode()).hexdigest()[:12]
+        pool_key = f"{self.host}:{self.port}:{self.user}:{self.database}:{password_fingerprint}"
         if pool_key not in PostgreSQLConnector._pools:
             try:
                 PostgreSQLConnector._pools[pool_key] = psycopg2.pool.ThreadedConnectionPool(
@@ -140,6 +143,7 @@ class PostgreSQLConnector(BaseConnector):
         offset: Optional[int] = None,
         no_cache: bool = False,
     ) -> List[Table]:
+        limit, offset = validate_limit_offset(limit, offset)
         cache_key = f"postgres_tables:{self.host}:{self.port}:{self.database}:{instance_name}:{schema_name}:{limit}:{offset}"
         cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
         if cached_data:

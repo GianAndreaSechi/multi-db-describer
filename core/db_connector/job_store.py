@@ -38,9 +38,17 @@ class JobStore:
         port: int = 6379,
         db: int = 0,
         prefix: str = "multi-db-connector",
+        socket_connect_timeout: float = 2.0,
     ):
         self.prefix = prefix
-        self.r = redis.Redis(host=host, port=port, db=db, decode_responses=True)
+        self.r = redis.Redis(
+            host=host,
+            port=port,
+            db=db,
+            decode_responses=True,
+            socket_connect_timeout=socket_connect_timeout,
+            health_check_interval=30,
+        )
         self._ensure_stream_group()
 
     # ------------------------------------------------------------------
@@ -125,7 +133,7 @@ class JobStore:
                 pass  # group already exists — expected on restart
             else:
                 logger.error(f"JobStore: Could not create consumer group: {e}")
-        except redis.exceptions.ConnectionError as e:
+        except redis.exceptions.RedisError as e:
             # Redis not reachable at startup — log and continue.
             # Operations will fail at call time with a clear ConnectionError.
             logger.warning(f"JobStore: Redis not reachable during startup — stream group not created: {e}")
@@ -181,6 +189,14 @@ class JobStore:
             "result_count": str(result_count),
         })
 
+    def mark_partial(self, job_id: str, result_count: int, error: str):
+        self.r.hset(self._job_key(job_id), mapping={
+            "status":       ScanStatus.PARTIAL.value,
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "result_count": str(result_count),
+            "error":        error,
+        })
+
     def mark_failed(self, job_id: str, error: str):
         self.r.hset(self._job_key(job_id), mapping={
             "status":       ScanStatus.FAILED.value,
@@ -228,13 +244,17 @@ class JobStore:
 
     def read_pending(self, consumer_name: str, count: int = 1, block_ms: int = 5000):
         """Blocking read of new (undelivered) messages from the stream."""
-        return self.r.xreadgroup(
-            CONSUMER_GROUP,
-            consumer_name,
-            {self._stream_key(): ">"},
-            count=count,
-            block=block_ms,
-        )
+        try:
+            return self.r.xreadgroup(
+                CONSUMER_GROUP,
+                consumer_name,
+                {self._stream_key(): ">"},
+                count=count,
+                block=block_ms,
+            )
+        except redis.exceptions.RedisError as e:
+            logger.warning(f"JobStore: read_pending failed: {e}")
+            return []
 
     def reclaim_abandoned(self, consumer_name: str, min_idle_ms: int = 30000, count: int = 10) -> list:
         """

@@ -3,13 +3,13 @@ from loguru import logger
 
 from core.db_connector.manager import ConnectorManager
 from core.db_connector.models import Instance
-from core.db_connector.configurations import DB_CONFIGURATIONS
+from core.db_connector.configurations import get_db_configurations
 
 
 class ConfigService:
     def __init__(self, connector_manager: ConnectorManager):
         self.connector_manager = connector_manager
-        self.db_configurations: Dict[str, Dict[str, Any]] = DB_CONFIGURATIONS
+        self.db_configurations: Dict[str, Dict[str, Any]] = get_db_configurations()
         logger.info(f"ConfigService: Initialized with {len(self.db_configurations)} database configurations.")
 
     def get_available_configurations(self) -> List[str]:

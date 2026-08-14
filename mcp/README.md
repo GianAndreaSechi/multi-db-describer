@@ -11,10 +11,10 @@ Model Context Protocol (MCP) server built with `fastmcp` that exposes API intros
 | Tool | Parameters | Description |
 |---|---|---|
 | `get_available_connectors` | `no_cache?` | List all active database configurations |
-| `list_instances` | `config_name`, `no_cache?` | List database instances (works for multi-host and flat connectors) |
-| `list_schemas` | `config_name`, `instance_name`, `no_cache?` | List schemas/databases within an instance |
-| `list_tables` | `config_name`, `instance_name`, `schema_name`, `no_cache?` | List tables within a schema |
-| `describe_table` | `config_name`, `instance_name`, `schema_name`, `table_name`, `no_cache?` | Describe a table (columns, primary keys, foreign keys, indexes) |
+| `list_instances` | `config_name?`, `no_cache?` | List database instances. Omit `config_name` to list all active configurations |
+| `list_schemas` | `config_name?`, `instance_name?`, `no_cache?` | List schemas/databases. Omitted fields expand the scope |
+| `list_tables` | `config_name?`, `instance_name?`, `schema_name?`, `limit?`, `offset?`, `no_cache?` | List tables. Omitted scope fields expand the query |
+| `describe_table` | `config_name?`, `instance_name?`, `schema_name?`, `table_name?`, `generate_ai_docs?`, `save_metadata?`, `no_cache?` | Describe tables with optional AI documentation |
 
 > 💡 **LLM Optimization**: All introspection tools automatically request data in **TOON** format (`Accept: application/toon`), drastically reducing token consumption compared to verbose JSON.
 
@@ -22,13 +22,13 @@ Model Context Protocol (MCP) server built with `fastmcp` that exposes API intros
 
 | Tool | Parameters | Description |
 |---|---|---|
-| `enqueue_scan` | `config_name?`, `instance_name?`, `schema_name?` | Launch an async background scan job — returns `job_id` |
+| `enqueue_scan` | `config_name?`, `instance_name?`, `schema_name?`, `generate_ai_docs?`, `save_metadata?` | Launch an async background scan job — returns `job_id` |
 | `get_scan_job` | `job_id`, `include_results?` | Check job status; set `include_results=True` to fetch full `TableDescription` list |
 | `list_scan_jobs` | `limit?` | List recent scan jobs (newest first) |
 
 Typical LLM agent workflow:
-1. Call `enqueue_scan(config_name="mysql_dev")` → receive `job_id`
-2. Poll `get_scan_job(job_id)` until `status == "completed"`
+1. Call `enqueue_scan(config_name="sales_mysql")` → receive `job_id`
+2. Poll `get_scan_job(job_id)` until `status` is `completed`, `partial`, or `failed`
 3. Call `get_scan_job(job_id, include_results=True)` to read scanned schemas
 
 ---
@@ -43,7 +43,6 @@ Copy `.env.example` to `.env`.
 | `MCP_HOST` | `0.0.0.0` | Listen address for HTTP transport |
 | `MCP_PORT` | `8000` | Listen port for HTTP transport |
 | `API_BASE_URL` | `http://localhost:8000` | Address of the running `multi-db-api` service |
-| `DB_CONFIG_FILE` | `/app/api/.env` | Path to container environment configuration file |
 
 ---
 
@@ -51,7 +50,7 @@ Copy `.env.example` to `.env`.
 
 ### Docker Compose
 
-Starting MCP via Docker Compose automatically provisions the **API**, the **MCP Server**, and the **Worker** (which consumes background scan jobs):
+Starting MCP via Docker Compose provisions the **API**, the **MCP Server**, and the **Worker**. Start the shared Redis infrastructure first:
 
 ```bash
 # 1. Start shared Redis infrastructure
@@ -88,4 +87,3 @@ Add to your client configuration (e.g. `~/.gemini/settings.json` or `claude_desk
 ```
 
 Replace `<mcp-host>:<port>` with your MCP server address (e.g. `http://localhost:8000/mcp`).
-

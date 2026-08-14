@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
-from .models import Instance, Schema, Table, Column
+from .models import Instance, Schema, Table, Column, TableDescription
 from .cache_manager import CacheManager # Import CacheManager
 
 class BaseConnector(ABC):
@@ -62,7 +62,7 @@ class BaseConnector(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def describe_table(self, instance_name: str, schema_name: str, table_name: str, no_cache: bool = False) -> List[Column]: # Add no_cache
+    def describe_table(self, instance_name: str, schema_name: str, table_name: str, no_cache: bool = False) -> TableDescription:
         """
         Describes the columns of a specific table.
         
@@ -73,6 +73,6 @@ class BaseConnector(ABC):
             no_cache: If True, bypass the cache and fetch directly from the database.
         
         Returns:
-            A list of Column objects detailing each column in the table.
+            A TableDescription object with columns, keys, and indexes.
         """
         raise NotImplementedError

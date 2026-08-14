@@ -33,6 +33,8 @@ class WorkerSettings:
     redis_db: int = int(os.getenv("REDIS_DB", 0))
     redis_ttl: int = int(os.getenv("REDIS_TTL_SECONDS", 86400))
     cache_prefix: str = os.getenv("CACHE_KEY_PREFIX", "multi-db-connector")
+    redis_socket_connect_timeout: float = float(os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS", 2))
+    redis_cache_socket_timeout: float = float(os.getenv("REDIS_CACHE_SOCKET_TIMEOUT_SECONDS", 2))
     # How long to block waiting for new stream messages (ms)
     stream_block_ms: int = int(os.getenv("WORKER_STREAM_BLOCK_MS", 5000))
     consumer_name: str = f"{socket.gethostname()}-{os.getpid()}"
@@ -53,6 +55,8 @@ class ScanWorker:
             db=settings.redis_db,
             ttl_seconds=settings.redis_ttl,
             project_prefix=settings.cache_prefix,
+            socket_connect_timeout=settings.redis_socket_connect_timeout,
+            socket_timeout=settings.redis_cache_socket_timeout,
         )
         connector_manager = ConnectorManager(cache_manager)
         config_service = ConfigService(connector_manager)
@@ -62,6 +66,7 @@ class ScanWorker:
             port=settings.redis_port,
             db=settings.redis_db,
             prefix=settings.cache_prefix,
+            socket_connect_timeout=settings.redis_socket_connect_timeout,
         )
         self.executor = ScanExecutorService(self.job_store, config_service)
 
@@ -124,7 +129,7 @@ class ScanWorker:
         self.job_store.mark_running(job_id)
 
         try:
-            count = self.executor.execute(
+            result = self.executor.execute(
                 job_id,
                 config_name,
                 instance_name,
@@ -133,8 +138,20 @@ class ScanWorker:
                 generate_ai_docs=generate_ai_docs,
                 save_metadata=save_metadata,
             )
-            self.job_store.mark_completed(job_id, count)
-            logger.info(f"ScanWorker: job {job_id} completed — {count} tables described")
+            if result.errors:
+                error_text = "; ".join(result.errors)
+                if result.count > 0:
+                    self.job_store.mark_partial(job_id, result.count, error_text)
+                    logger.warning(
+                        f"ScanWorker: job {job_id} partially completed — "
+                        f"{result.count} tables described, {len(result.errors)} error(s)"
+                    )
+                else:
+                    self.job_store.mark_failed(job_id, error_text)
+                    logger.warning(f"ScanWorker: job {job_id} failed — no tables described")
+            else:
+                self.job_store.mark_completed(job_id, result.count)
+                logger.info(f"ScanWorker: job {job_id} completed — {result.count} tables described")
         except Exception as e:
             logger.exception(f"ScanWorker: job {job_id} failed: {e}")
             self.job_store.mark_failed(job_id, str(e))

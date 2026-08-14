@@ -1,12 +1,22 @@
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DescribeTableRequest(BaseModel):
-    config_name: str
-    instance_name: str
-    schema_name: str
-    table_name: str
-    generate_ai_docs: bool = False
-    save_metadata: bool = True
+    config_name: Optional[str] = Field(
+        default=None,
+        description="Configured database target name, e.g. 'mysql_publishers_dev'.",
+    )
+    instance_name: Optional[str] = Field(
+        default=None,
+        description="Database instance returned by list_instances. For MySQL this is the configured host.",
+    )
+    schema_name: Optional[str] = Field(
+        default=None,
+        description="Schema/database name, e.g. 'quality_checks'.",
+    )
+    table_name: Optional[str] = Field(default=None, description="Table name to describe.")
+    generate_ai_docs: bool = Field(default=False, description="Generate AI documentation.")
+    save_metadata: bool = Field(default=True, description="Persist generated metadata.")
+
 

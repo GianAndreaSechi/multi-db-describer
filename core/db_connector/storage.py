@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import json
+import re
 from datetime import datetime, timezone
 import os
 from pathlib import Path
@@ -55,13 +56,18 @@ class FileMetadataStore(BaseMetadataStore):
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
+    @staticmethod
+    def _sanitize(name: str) -> str:
+        """Replace any character that is not alphanumeric, dot, hyphen, or underscore."""
+        return re.sub(r"[^\w.\-]", "_", name)
+
     def _get_file_path(
         self, config_name: str, instance_name: str, schema_name: str, table_name: str
     ) -> Path:
-        safe_config = config_name.replace("/", "_")
-        safe_instance = instance_name.replace("/", "_")
-        safe_schema = schema_name.replace("/", "_")
-        safe_table = table_name.replace("/", "_")
+        safe_config = self._sanitize(config_name)
+        safe_instance = self._sanitize(instance_name)
+        safe_schema = self._sanitize(schema_name)
+        safe_table = self._sanitize(table_name)
         return self.base_dir / safe_config / safe_instance / safe_schema / f"{safe_table}.json"
 
     def get_table_metadata(

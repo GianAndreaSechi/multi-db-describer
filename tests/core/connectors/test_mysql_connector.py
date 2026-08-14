@@ -1,33 +1,32 @@
 import pytest
+import os
 from core.db_connector.connectors.mysql import MySQLConnector
-from core.db_connector.models import Instance, Schema, Table, Column, TableDescription, PrimaryKey, ForeignKey, Index # Updated import
-from loguru import logger # New import
+from core.db_connector.models import TableDescription
+from loguru import logger
+
+
+class DummyCacheManager:
+    def get_cached_data(self, key, no_cache=False):
+        return None
+
+    def set_cached_data(self, key, data, ttl=None):
+        pass
 
 # --- Configuration for MySQL Test (ADJUST THESE VALUES) ---
 # For a real test, you would need a running MySQL instance.
 # Consider using Docker for a temporary test database.
 MYSQL_TEST_CONFIG = {
-    "host": "<your_mysql_host>",  # e.g., "localhost" or "mysql_test_container"
-    "user": "<your_mysql_user>",  # e.g., "root"
-    "password": "<your_mysql_password>",  # e.g., "password"
-    "port": 3306,
+    "host": os.getenv("MYSQL_TEST_HOST"),
+    "user": os.getenv("MYSQL_TEST_USER"),
+    "password": os.getenv("MYSQL_TEST_PASSWORD", ""),
+    "port": int(os.getenv("MYSQL_TEST_PORT", 3306)),
     # "database": "test_db" # Optional, for specific database operations
 }
 # ----------------------------------------------------------
 
-# Skip MySQL tests if configuration is not set or if connection fails
-try:
-    # Attempt a connection to verify config (without selecting a specific DB)
-    # This is just a preliminary check, actual tests will use the fixture
-    temp_conn = MySQLConnector(connection_params=MYSQL_TEST_CONFIG)
-    MYSQL_IS_AVAILABLE = True
-except (ValueError, ConnectionError) as e:
-    logger.error(f"MySQL test skipped: {e}")
-    logger.exception("MySQL connection test failed:")
-    MYSQL_IS_AVAILABLE = False
-
-mysql_skip_reason = "MySQL test configuration is invalid or connection failed."
-pytestmark = pytest.mark.skipif(not MYSQL_IS_AVAILABLE, reason=mysql_skip_reason)
+MYSQL_IS_CONFIGURED = bool(MYSQL_TEST_CONFIG["host"] and MYSQL_TEST_CONFIG["user"])
+mysql_skip_reason = "Set MYSQL_TEST_HOST and MYSQL_TEST_USER to run MySQL integration tests."
+pytestmark = pytest.mark.skipif(not MYSQL_IS_CONFIGURED, reason=mysql_skip_reason)
 
 @pytest.fixture(scope="module")
 def mysql_connector():
@@ -46,7 +45,14 @@ def mysql_connector():
     # );
     # INSERT INTO test_table (name, value) VALUES ('item1', 10), ('item2', 20);
 
-    connector = MySQLConnector(connection_params=MYSQL_TEST_CONFIG)
+    try:
+        connector = MySQLConnector(
+            connection_params=MYSQL_TEST_CONFIG,
+            cache_manager=DummyCacheManager(),
+        )
+    except (ValueError, ConnectionError) as e:
+        logger.error(f"MySQL test skipped: {e}")
+        pytest.skip(f"MySQL connection unavailable: {e}")
     yield connector
     # Teardown (optional): clean up test data or drop test database
     # For simplicity, not implemented here.

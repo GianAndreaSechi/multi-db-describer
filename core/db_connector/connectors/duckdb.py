@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 from core.db_connector.interface import BaseConnector
 from core.db_connector.models import Instance, Schema, Table, Column, TableDescription
 from core.db_connector.models.table_details import PrimaryKey, ForeignKey, Index
+from core.db_connector.sql_utils import quote_sql_string, validate_limit_offset
 from loguru import logger
 from ..cache_manager import CacheManager # Import CacheManager
 
@@ -85,6 +86,7 @@ class DuckDBConnector(BaseConnector):
         return schemas
 
     def list_tables(self, instance_name: str, schema_name: str, limit: Optional[int] = None, offset: Optional[int] = None, no_cache: bool = False) -> List[Table]:
+        limit, offset = validate_limit_offset(limit, offset)
         cache_key = f"duckdb_tables:{self.database}:{instance_name}:{schema_name}:{limit}:{offset}"
         cached_data = self.cache_manager.get_cached_data(cache_key, no_cache)
         if cached_data:
@@ -97,7 +99,7 @@ class DuckDBConnector(BaseConnector):
         query = f"""
         SELECT table_name
         FROM information_schema.tables
-        WHERE table_schema = '{schema_name}'
+        WHERE table_schema = ?
         """
         
         if limit is not None:
@@ -107,7 +109,7 @@ class DuckDBConnector(BaseConnector):
 
         query += ";"
 
-        rows = self._execute_query(query)
+        rows = self._execute_query(query, (schema_name,))
         tables = [Table(name=row["table_name"], schema_name=schema_name) for row in rows]
         
         self.cache_manager.set_cached_data(cache_key, [t.model_dump() for t in tables])
@@ -123,7 +125,7 @@ class DuckDBConnector(BaseConnector):
             logger.error(f"Instance name '{instance_name}' does not match connected database '{self.database}'")
             raise ValueError(f"Instance name '{instance_name}' does not match connected database '{self.database}'")
         
-        query = f"PRAGMA table_info('{schema_name}.{table_name}');"
+        query = f"PRAGMA table_info({quote_sql_string(f'{schema_name}.{table_name}')});"
         rows = self._execute_query(query)
         
         columns = []
@@ -155,14 +157,14 @@ class DuckDBConnector(BaseConnector):
         return table_description
 
     def _get_primary_key_details(self, schema_name: str, table_name: str) -> Optional[PrimaryKey]:
-        query = f"""
+        query = """
             SELECT constraint_column_names
             FROM duckdb_constraints()
-            WHERE table_name = '{table_name}'
-              AND schema_name = '{schema_name}'
+            WHERE table_name = ?
+              AND schema_name = ?
               AND constraint_type = 'PRIMARY KEY'
         """
-        rows = self._execute_query(query)
+        rows = self._execute_query(query, (table_name, schema_name))
         if rows:
             col_names = rows[0].get('constraint_column_names', [])
             if isinstance(col_names, list) and col_names:
@@ -170,7 +172,7 @@ class DuckDBConnector(BaseConnector):
         return None
 
     def _get_foreign_key_details(self, schema_name: str, table_name: str) -> List[ForeignKey]:
-        query = f"""
+        query = """
             SELECT
                 kcu.column_name,
                 ccu.table_name AS referenced_table,
@@ -184,10 +186,10 @@ class DuckDBConnector(BaseConnector):
             JOIN information_schema.constraint_column_usage AS ccu
                 ON ccu.constraint_name = tc.constraint_name
             WHERE tc.constraint_type = 'FOREIGN KEY'
-              AND tc.table_name = '{table_name}'
-              AND tc.table_schema = '{schema_name}'
+              AND tc.table_name = ?
+              AND tc.table_schema = ?
         """
-        rows = self._execute_query(query)
+        rows = self._execute_query(query, (table_name, schema_name))
         return [
             ForeignKey(
                 column_name=row['column_name'],
@@ -199,13 +201,13 @@ class DuckDBConnector(BaseConnector):
         ]
 
     def _get_index_details(self, schema_name: str, table_name: str) -> List[Index]:
-        query = f"""
+        query = """
             SELECT index_name, is_unique, is_primary, sql
             FROM duckdb_indexes()
-            WHERE table_name = '{table_name}'
-              AND schema_name = '{schema_name}'
+            WHERE table_name = ?
+              AND schema_name = ?
         """
-        rows = self._execute_query(query)
+        rows = self._execute_query(query, (table_name, schema_name))
         indexes = []
         for row in rows:
             col_names = []

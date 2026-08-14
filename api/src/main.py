@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException, Request, Header, Depends
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 from loguru import logger
+from datetime import datetime, timezone
+import asyncio
 import os
 
 from core.db_connector.manager import ConnectorManager
@@ -37,7 +39,9 @@ cache_manager = CacheManager(
     host=os.getenv("REDIS_HOST", "localhost"),
     port=int(os.getenv("REDIS_PORT", 6379)),
     db=int(os.getenv("REDIS_DB", 0)),
-    ttl_seconds=int(os.getenv("REDIS_TTL_SECONDS", 86400)) # Default 1 day
+    ttl_seconds=int(os.getenv("REDIS_TTL_SECONDS", 86400)), # Default 1 day
+    socket_connect_timeout=float(os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS", 2)),
+    socket_timeout=float(os.getenv("REDIS_CACHE_SOCKET_TIMEOUT_SECONDS", 2)),
 )
 
 # Initialize ConnectorManager and Services
@@ -53,6 +57,7 @@ job_store = JobStore(
     port=int(os.getenv("REDIS_PORT", 6379)),
     db=int(os.getenv("REDIS_DB", 0)),
     prefix=os.getenv("CACHE_KEY_PREFIX", "multi-db-connector"),
+    socket_connect_timeout=float(os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS", 2)),
 )
 scan_service = ScanService(job_store)
 
@@ -69,7 +74,11 @@ async def read_root(http_request: Request):
 @app.get("/ping")
 async def ping(http_request: Request):
     logger.info("Ping endpoint accessed.")
-    return api_response(http_request, "Pong!", {"status": "success", "timestamp": str(os.times())})
+    return api_response(
+        http_request,
+        "Pong!",
+        {"status": "success", "timestamp": datetime.now(timezone.utc).isoformat()},
+    )
 
 @app.get("/configurations")
 async def get_available_configurations(http_request: Request, no_cache: bool = Depends(get_no_cache_header)): # Add no_cache
@@ -109,7 +118,8 @@ async def list_instances_route(req: InstanceRequest, http_request: Request, no_c
     """
     logger.info(f"API: Listing instances for config name: {req.config_name}")
     try:
-        data = instance_service.list_instances([req.config_name], no_cache=no_cache) # Pass no_cache
+        config_names = [req.config_name] if req.config_name else None
+        data = instance_service.list_instances(config_names, no_cache=no_cache) # Pass no_cache
         return api_response(http_request, "Instances retrieved successfully.", data)
     except ValueError as e:
         logger.error(f"API: Listing instances failed: {e}")
@@ -118,7 +128,7 @@ async def list_instances_route(req: InstanceRequest, http_request: Request, no_c
         logger.error(f"API: Listing instances failed: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to connect: {e}")
     except Exception as e:
-        logger.exception(f"API: An unexpected error occurred while listing instances for config names: {req.config_names}")
+        logger.exception(f"API: An unexpected error occurred while listing instances for config name: {req.config_name}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
 @app.post("/schemas")
@@ -174,9 +184,16 @@ async def describe_table_route(req: DescribeTableRequest, http_request: Request,
     If schema_name is not specified, describes tables for all schemas within the specified instance(s).
     If table_name is not specified, describes all tables within the specified schema(s).
     """
-    logger.info(f"API: Describing table for config: {req.config_name if req.config_name else 'all'}, instance: {req.instance_name if req.instance_name else 'all'}, schema: {req.schema_name if req.schema_name else 'all'}, table: {req.table_name if req.table_name else 'all'}")
+    logger.info(
+        f"API: Describing table for config: {req.config_name if req.config_name else 'all'}, "
+        f"instance: {req.instance_name if req.instance_name else 'all'}, "
+        f"schema: {req.schema_name if req.schema_name else 'all'}, "
+        f"table: {req.table_name if req.table_name else 'all'}, "
+        f"generate_ai_docs={req.generate_ai_docs}, save_metadata={req.save_metadata}"
+    )
     try:
-        data = describe_table_service.describe_table(
+        data = await asyncio.to_thread(
+            describe_table_service.describe_table,
             req.config_name,
             req.instance_name,
             req.schema_name,

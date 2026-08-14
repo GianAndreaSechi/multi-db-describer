@@ -1,5 +1,12 @@
-from pydantic import BaseModel
+from typing import Optional
+from pydantic import BaseModel, Field
 
 
 class InstanceRequest(BaseModel):
-    config_name: str
+    config_name: Optional[str] = Field(
+        default=None,
+        description=(
+            "Configured database target name, e.g. 'mysql_publishers_dev'. "
+            "Omit to list instances for all configured targets."
+        ),
+    )
