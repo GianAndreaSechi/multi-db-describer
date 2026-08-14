@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  multi-db-core:
+  irides-core:
     build:
       context: ..
       dockerfile: core/Dockerfile
@@ -10,9 +10,9 @@ services:
       REDIS_PORT: 6379
       REDIS_DB: 0
       REDIS_TTL_SECONDS: 86400
-      CACHE_KEY_PREFIX: multi-db-connector
+      CACHE_KEY_PREFIX: irides
     networks:
-      - multi-db-net
+      - irides-net
     volumes:
       - ../core:/app/core
     # The CMD from core/Dockerfile will keep the container running
@@ -21,5 +21,5 @@ services:
     restart: always
 
 networks:
-  multi-db-net:
+  irides-net:
     external: true
