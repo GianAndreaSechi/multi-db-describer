@@ -4,7 +4,7 @@ version: '3.8'
 #   docker compose -f docker-compose.infra.yml up -d
 #
 # API, Worker and MCP docker-compose files reference the
-# 'multi-db-net' network as external and use REDIS_HOST=redis.
+# 'irides-net' network as external and use REDIS_HOST=redis.
 
 services:
   redis:
@@ -14,12 +14,12 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - multi-db-net
+      - irides-net
     restart: always
 
 networks:
-  multi-db-net:
-    name: multi-db-net
+  irides-net:
+    name: irides-net
 
 volumes:
   redis_data:

@@ -1,4 +1,4 @@
-# MCP — Multi-DB Describer Control Plane
+# MCP — Irides Control Plane
 
 Model Context Protocol (MCP) server built with `fastmcp` that exposes API introspection, async scan capabilities, and stored metadata read/write as tools for LLM agents (Claude, Gemini, Cursor, IDE assistants, etc.).
 
@@ -60,7 +60,7 @@ Copy `.env.example` to `.env`.
 | `MCP_TRANSPORT` | `http` | Transport protocol (`http` or `stdio`) |
 | `MCP_HOST` | `0.0.0.0` | Listen address for HTTP transport |
 | `MCP_PORT` | `8000` | Listen port for HTTP transport |
-| `API_BASE_URL` | `http://localhost:8000` | Address of the running `multi-db-api` service |
+| `API_BASE_URL` | `http://localhost:8000` | Address of the running `irides-api` service |
 | `API_PREFIX` | `/api/v1` | API version prefix — must match the API service setting |
 
 ---
@@ -97,7 +97,7 @@ Add to your client configuration (e.g. `~/.gemini/settings.json` or `claude_desk
 ```json
 {
   "mcpServers": {
-    "multi-db-describer": {
+    "irides": {
       "command": "npx",
       "args": ["-y", "mcp-remote@latest", "http://<mcp-host>:<port>/mcp"]
     }

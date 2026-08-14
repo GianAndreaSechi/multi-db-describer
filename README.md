@@ -1,4 +1,4 @@
-# multi-db-describer
+# irides
 
 A unified, asynchronous database introspection layer designed to help LLMs and applications extract, summarize, and understand schemas across heterogeneous data stores.
 
@@ -8,7 +8,7 @@ A unified, asynchronous database introspection layer designed to help LLMs and a
 
 When building AI agents or data tools across multiple databases, a primary challenge is providing accurate, low-overhead schema context. Without proper grounding, LLMs frequently hallucinate column names, infer non-existent relationships, or generate invalid SQL/NoSQL queries.
 
-`multi-db-describer` acts as a **context provider layer** that:
+`irides` acts as a **context provider layer** that:
 - Introspects diverse SQL, NoSQL, and cloud analytics databases.
 - Normalizes schemas, tables, columns, indexes, and primary/foreign keys into structured Pydantic models.
 - Provides a versioned REST API (`/api/v1`), MCP endpoints, and asynchronous table scanning via **Redis Streams**.
@@ -60,7 +60,7 @@ The system is split into microservices connected via Docker networks and Redis S
 ```
 
 - **`core/`**: Shared Python library providing connector abstractions, models, caching, configuration loaders, and Redis `JobStore`.
-- **`infra/`**: Shared Redis container and `multi-db-net` Docker network.
+- **`infra/`**: Shared Redis container and `irides-net` Docker network.
 - **`api/`**: FastAPI web service exposing the versioned REST API, Metadata API, and Web UI.
 - **`worker/`**: Async task consumer executing background scans and writing results to the Metadata Store.
 - **`mcp/`**: FastMCP server exposing introspection tools directly to AI assistants.
@@ -366,7 +366,7 @@ from core.db_connector.manager import ConnectorManager
 from core.db_connector.config_service import ConfigService
 
 # 1. Initialize Redis Cache & Connector Manager
-cache = CacheManager(host="localhost", port=6379, project_prefix="multi-db-connector")
+cache = CacheManager(host="localhost", port=6379, project_prefix="irides")
 manager = ConnectorManager(cache_manager=cache)
 
 # 2. Initialize ConfigService (loads active DBs from environment)
@@ -404,3 +404,4 @@ for col in table_desc.columns:
   - [x] Web UI for metadata browsing and editing (`/ui`)
   - [x] `only_if_changed` flag on describe/scan to avoid overwriting unchanged schemas
   - [x] Custom field preservation across re-describes
+  - [ ] Refactoring code and moving hardcoded values to constants/config files.

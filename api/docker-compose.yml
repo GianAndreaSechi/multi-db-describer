@@ -4,7 +4,7 @@ version: '3.8'
 #   docker compose -f ../infra/docker-compose.infra.yml up -d
 
 services:
-  multi-db-api:
+  irides-api:
     build:
       context: ..
       dockerfile: api/Dockerfile
@@ -18,7 +18,7 @@ services:
       REDIS_TTL_SECONDS: 86400
       REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS: 2
       REDIS_CACHE_SOCKET_TIMEOUT_SECONDS: 2
-      CACHE_KEY_PREFIX: multi-db-connector
+      CACHE_KEY_PREFIX: irides
       STORAGE_METADATA_DIR: /app/storage/metadata
       DB_CONFIG_FILE: /app/api/.env
       LITELLM_MODEL: ${LITELLM_MODEL:-gpt-4o-mini}
@@ -27,12 +27,12 @@ services:
       LITELLM_TIMEOUT_SECONDS: ${LITELLM_TIMEOUT_SECONDS:-120}
       LITELLM_MAX_RETRIES: ${LITELLM_MAX_RETRIES:-2}
     networks:
-      - multi-db-net
+      - irides-net
     volumes:
       - ../api:/app/api
       - ../core:/app/core
     restart: always
 
 networks:
-  multi-db-net:
+  irides-net:
     external: true

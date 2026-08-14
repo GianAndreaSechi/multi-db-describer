@@ -44,7 +44,7 @@ Copy `.env.example` to `.env`.
 | `REDIS_PORT` | `6379` | Redis port |
 | `REDIS_DB` | `0` | Redis database index |
 | `REDIS_TTL_SECONDS` | `86400` | Introspection cache TTL |
-| `CACHE_KEY_PREFIX` | `multi-db-connector` | Redis key prefix (must match API) |
+| `CACHE_KEY_PREFIX` | `irides` | Redis key prefix (must match API) |
 | `SCAN_RESULTS_TTL_SECONDS` | `604800` | Scan result retention in Redis (7 days) |
 | `WORKER_STREAM_BLOCK_MS` | `5000` | Stream read timeout per poll cycle |
 | `DB_CONFIG_FILE` | *(none)* | Explicit path to `.env` file for Docker container |
