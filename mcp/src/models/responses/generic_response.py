@@ -12,3 +12,4 @@ class ToonResponse(BaseModel):
     toon: str
 
 UnifiedResponse = Union[GenericResponse, ToonResponse]
+
