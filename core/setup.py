@@ -15,5 +15,7 @@ setup(
         'pymongo',
         'psycopg2-binary',
         'trino',
+        'python-dotenv',
+        'litellm',
     ],
 )
