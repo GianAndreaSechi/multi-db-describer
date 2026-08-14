@@ -25,6 +25,8 @@ def register_tools(mcp):
 
         Options:
           - generate_ai_docs: generate a business summary and column descriptions via the configured LLM.
+            Set this to True whenever the user asks for AI analysis,
+            AI documentation, business documentation, or an AI-generated explanation.
           - save_metadata: persist generated metadata to the configured storage.
         
         Cache:
@@ -33,7 +35,7 @@ def register_tools(mcp):
         logger.info(
             f"MCP: Enqueueing scan job "
             f"[config={request.config_name}, instance={request.instance_name}, schema={request.schema_name}, "
-            f"generate_ai_docs={request.generate_ai_docs}, no_cache={no_cache}]"
+            f"generate_ai_docs={request.generate_ai_docs}, save_metadata={request.save_metadata}, no_cache={no_cache}]"
         )
         api_response = await api_client.post(
             "/scan",
@@ -55,7 +57,7 @@ def register_tools(mcp):
         Get the status of a scan job by job_id.
         Set include_results=True to also retrieve the full list of TableDescriptions.
 
-        Possible statuses: pending | running | completed | failed
+        Possible statuses: pending | running | completed | partial | failed
         """
         logger.info(f"MCP: Getting scan job {job_id} (include_results={include_results})")
         endpoint = f"/scan/{job_id}?include_results={str(include_results).lower()}"
