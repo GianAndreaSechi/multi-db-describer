@@ -5,16 +5,33 @@ from loguru import logger
 import os
 
 class CacheManager:
-    def __init__(self, host: str = 'localhost', port: int = 6379, db: int = 0, ttl_seconds: int = 86400, project_prefix: Optional[str] = None):
+    def __init__(
+        self,
+        host: str = 'localhost',
+        port: int = 6379,
+        db: int = 0,
+        ttl_seconds: int = 86400,
+        project_prefix: Optional[str] = None,
+        socket_connect_timeout: float = 2.0,
+        socket_timeout: float = 2.0,
+    ):
         self.redis_client = None
         self.ttl_seconds = ttl_seconds # Default 1 day
         self.project_prefix = project_prefix if project_prefix is not None else os.getenv("CACHE_KEY_PREFIX", "multi-db-connector")
         try:
-            self.redis_client = redis.Redis(host=host, port=port, db=db, decode_responses=True)
+            self.redis_client = redis.Redis(
+                host=host,
+                port=port,
+                db=db,
+                decode_responses=True,
+                socket_connect_timeout=socket_connect_timeout,
+                socket_timeout=socket_timeout,
+                health_check_interval=30,
+            )
             self.redis_client.ping()
             logger.info(f"Successfully connected to Redis at {host}:{port}/{db}")
-        except redis.exceptions.ConnectionError as e:
-            logger.error(f"Could not connect to Redis at {host}:{port}/{db}: {e}")
+        except redis.exceptions.RedisError as e:
+            logger.error(f"Could not connect to Redis cache at {host}:{port}/{db}: {e}")
             self.redis_client = None # Ensure client is None if connection fails
 
     def _serialize(self, data: Any) -> str:
