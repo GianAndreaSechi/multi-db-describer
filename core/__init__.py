@@ -1,0 +1,2 @@
+"""Irides core library."""
+

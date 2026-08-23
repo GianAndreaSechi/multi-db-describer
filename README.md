@@ -60,6 +60,7 @@ The system is split into microservices connected via Docker networks and Redis S
 ```
 
 - **`core/`**: Shared Python library providing connector abstractions, models, caching, configuration loaders, and Redis `JobStore`.
+- **`cli/`**: Command-line client built only on `core`, for direct synchronous introspection without running the API service.
 - **`infra/`**: Shared Redis container and `irides-net` Docker network.
 - **`api/`**: FastAPI web service exposing the versioned REST API, Metadata API, and Web UI.
 - **`worker/`**: Async task consumer executing background scans and writing results to the Metadata Store.
