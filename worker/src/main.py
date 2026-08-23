@@ -120,11 +120,14 @@ class ScanWorker:
         no_cache = data.get("no_cache") == "true"
         generate_ai_docs = data.get("generate_ai_docs") == "true"
         save_metadata = data.get("save_metadata", "true") == "true"
+        only_if_changed = data.get("only_if_changed") == "true"
+        save_markdown = data.get("save_markdown") == "true"
 
         logger.info(
             f"ScanWorker: processing job {job_id} "
             f"[config={config_name}, instance={instance_name}, schema={schema_name}, "
-            f"no_cache={no_cache}, generate_ai_docs={generate_ai_docs}, save_metadata={save_metadata}]"
+            f"no_cache={no_cache}, generate_ai_docs={generate_ai_docs}, save_metadata={save_metadata}, "
+            f"only_if_changed={only_if_changed}, save_markdown={save_markdown}]"
         )
         self.job_store.mark_running(job_id)
 
@@ -137,6 +140,8 @@ class ScanWorker:
                 no_cache=no_cache,
                 generate_ai_docs=generate_ai_docs,
                 save_metadata=save_metadata,
+                only_if_changed=only_if_changed,
+                save_markdown=save_markdown,
             )
             if result.errors:
                 error_text = "; ".join(result.errors)

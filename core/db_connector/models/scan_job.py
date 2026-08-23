@@ -19,6 +19,8 @@ class ScanScope(BaseModel):
     no_cache: bool = False               # If True, bypass cache during scan
     generate_ai_docs: bool = False       # If True, generate AI documentation via LiteLLM
     save_metadata: bool = True           # If True, save/update JSON metadata
+    only_if_changed: bool = False        # If True, skip unchanged metadata writes
+    save_markdown: bool = False          # If True, save an LLM-friendly Markdown companion file
 
 
 

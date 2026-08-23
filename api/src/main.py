@@ -198,7 +198,8 @@ async def describe_table_route(req: DescribeTableRequest, http_request: Request,
         f"instance: {req.instance_name if req.instance_name else 'all'}, "
         f"schema: {req.schema_name if req.schema_name else 'all'}, "
         f"table: {req.table_name if req.table_name else 'all'}, "
-        f"generate_ai_docs={req.generate_ai_docs}, save_metadata={req.save_metadata}"
+        f"generate_ai_docs={req.generate_ai_docs}, save_metadata={req.save_metadata}, "
+        f"only_if_changed={req.only_if_changed}, save_markdown={req.save_markdown}"
     )
     try:
         data = await asyncio.to_thread(
@@ -211,6 +212,7 @@ async def describe_table_route(req: DescribeTableRequest, http_request: Request,
             generate_ai_docs=req.generate_ai_docs,
             save_metadata=req.save_metadata,
             only_if_changed=req.only_if_changed,
+            save_markdown=req.save_markdown,
         )
         return api_response(http_request, "Table description retrieved successfully.", data)
     except ValueError as e:
@@ -243,7 +245,8 @@ async def enqueue_scan(req: ScanRequest, http_request: Request, no_cache: bool =
     logger.info(
         f"API: Enqueuing scan job config={req.config_name}, "
         f"instance={req.instance_name}, schema={req.schema_name}, no_cache={no_cache}, "
-        f"generate_ai_docs={req.generate_ai_docs}, save_metadata={req.save_metadata}"
+        f"generate_ai_docs={req.generate_ai_docs}, save_metadata={req.save_metadata}, "
+        f"only_if_changed={req.only_if_changed}, save_markdown={req.save_markdown}"
     )
     try:
         job = scan_service.enqueue_scan(
@@ -253,6 +256,8 @@ async def enqueue_scan(req: ScanRequest, http_request: Request, no_cache: bool =
             no_cache=no_cache,
             generate_ai_docs=req.generate_ai_docs,
             save_metadata=req.save_metadata,
+            only_if_changed=req.only_if_changed,
+            save_markdown=req.save_markdown,
         )
         return api_response(http_request, "Scan job enqueued successfully.", job.model_dump(mode="json"))
 

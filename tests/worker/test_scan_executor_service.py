@@ -166,3 +166,19 @@ class TestExecuteMetadata:
             executor.execute("job-1", "cfg1", "host", "mydb", save_metadata=False)
 
         mock_store.save_table_metadata.assert_not_called()
+
+    def test_metadata_passes_only_if_changed_and_markdown_options(self, executor):
+        mock_store = MagicMock()
+        with patch(
+            "worker.src.services.scan_executor_service.get_metadata_store",
+            return_value=mock_store,
+        ):
+            executor.execute(
+                "job-1", "cfg1", "host", "mydb",
+                only_if_changed=True,
+                save_markdown=True,
+            )
+
+        kwargs = mock_store.save_table_metadata.call_args.kwargs
+        assert kwargs["only_if_changed"] is True
+        assert kwargs["save_markdown"] is True

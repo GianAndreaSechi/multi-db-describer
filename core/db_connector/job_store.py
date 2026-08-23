@@ -70,6 +70,8 @@ class JobStore:
             "no_cache":         "true" if job.scope.no_cache else "false",
             "generate_ai_docs": "true" if job.scope.generate_ai_docs else "false",
             "save_metadata":    "true" if job.scope.save_metadata else "false",
+            "only_if_changed":  "true" if job.scope.only_if_changed else "false",
+            "save_markdown":    "true" if job.scope.save_markdown else "false",
             "created_at":       _str(job.created_at),
             "started_at":       _str(job.started_at),
             "completed_at":     _str(job.completed_at),
@@ -93,6 +95,8 @@ class JobStore:
                 no_cache=fields.get("no_cache") == "true",
                 generate_ai_docs=fields.get("generate_ai_docs") == "true",
                 save_metadata=fields.get("save_metadata", "true") == "true",
+                only_if_changed=fields.get("only_if_changed") == "true",
+                save_markdown=fields.get("save_markdown") == "true",
             ),
             created_at=_dt(fields.get("created_at", "")),
             started_at=_dt(fields.get("started_at", "")),
@@ -165,6 +169,8 @@ class JobStore:
             "no_cache":         fields["no_cache"],
             "generate_ai_docs": fields["generate_ai_docs"],
             "save_metadata":    fields["save_metadata"],
+            "only_if_changed":  fields["only_if_changed"],
+            "save_markdown":    fields["save_markdown"],
         })
         pipe.execute()
 

@@ -124,6 +124,33 @@ class TestOnlyIfChanged:
         assert store.get_table_metadata("cfg", "inst", "sch", "new_table") is not None
 
 
+class TestMarkdownMetadata:
+    def test_saves_llm_friendly_markdown_companion(self, store, tmp_path):
+        ai_doc = {
+            "summary": "Stores application users.",
+            "column_descriptions": {"id": "Primary identifier."},
+        }
+        store.save_table_metadata(
+            "cfg", "inst", "sch", "users", SCHEMA_DESC,
+            ai_documentation=ai_doc,
+            save_markdown=True,
+        )
+
+        markdown = (tmp_path / "cfg" / "inst" / "sch" / "users.md").read_text()
+        assert "# sch.users" in markdown
+        assert "Stores application users." in markdown
+        assert "| id | int |  | Primary identifier. |" in markdown
+
+    def test_creates_markdown_when_unchanged_metadata_is_skipped(self, store, tmp_path):
+        store.save_table_metadata("cfg", "inst", "sch", "users", SCHEMA_DESC)
+        store.save_table_metadata(
+            "cfg", "inst", "sch", "users", SCHEMA_DESC,
+            only_if_changed=True,
+            save_markdown=True,
+        )
+        assert (tmp_path / "cfg" / "inst" / "sch" / "users.md").exists()
+
+
 class TestCustomFieldCarryForward:
     def test_custom_fields_preserved_on_resave(self, store):
         store.save_table_metadata("cfg", "inst", "sch", "users", SCHEMA_DESC)

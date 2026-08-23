@@ -2,10 +2,10 @@
 
 A unified, asynchronous database introspection layer designed to help LLMs and applications extract, summarize, and understand schemas across heterogeneous data stores.
 
-Version: v0.3.1
 ---
 
 ## Overview
+<b>Version: v0.4.0-alpha</b>
 
 When building AI agents or data tools across multiple databases, a primary challenge is providing accurate, low-overhead schema context. Without proper grounding, LLMs frequently hallucinate column names, infer non-existent relationships, or generate invalid SQL/NoSQL queries.
 
@@ -82,8 +82,8 @@ All API endpoints are served under the `/api/v1` prefix.
 | `POST` | `/api/v1/instances` | `config_name?` | List instances; omit `config_name` to list all |
 | `POST` | `/api/v1/schemas` | `config_name?`, `instance_name?` | List databases/schemas |
 | `POST` | `/api/v1/tables` | `config_name?`, `instance_name?`, `schema_name?`, `limit?`, `offset?` | List tables |
-| `POST` | `/api/v1/describe` | `config_name?`, `instance_name?`, `schema_name?`, `table_name?`, `generate_ai_docs?`, `save_metadata?`, `only_if_changed?` | Describe table structure |
-| `POST` | `/api/v1/scan` | `config_name?`, `instance_name?`, `schema_name?`, `generate_ai_docs?`, `save_metadata?` | Enqueue async scan job — returns `job_id` (HTTP 202) |
+| `POST` | `/api/v1/describe` | `config_name?`, `instance_name?`, `schema_name?`, `table_name?`, `generate_ai_docs?`, `save_metadata?`, `only_if_changed?`, `save_markdown?` | Describe table structure |
+| `POST` | `/api/v1/scan` | `config_name?`, `instance_name?`, `schema_name?`, `generate_ai_docs?`, `save_metadata?`, `only_if_changed?`, `save_markdown?` | Enqueue async scan job — returns `job_id` (HTTP 202) |
 | `GET` | `/api/v1/scan/{job_id}` | `include_results?` | Get scan job status and optional results |
 | `GET` | `/api/v1/scans` | `limit?` | List recent scan jobs (newest first) |
 
@@ -143,6 +143,8 @@ Example request body:
 `save_table_metadata` preserves any custom fields already present in the stored document whenever a table is re-described or re-scanned. Human annotations are never silently overwritten by automated introspection runs.
 
 Pass `only_if_changed=true` on a describe or scan request to skip writing to the Metadata Store when the freshly introspected schema is identical to the stored one. This avoids resetting `updated_at` and is the default mode used by the Web UI's single-table refresh action.
+
+Pass `save_markdown=true` on a describe or scan request to save an LLM-friendly Markdown companion file (`<table>.md`) next to each JSON metadata document. It contains source scope, columns, keys, and AI documentation when generated.
 
 ---
 

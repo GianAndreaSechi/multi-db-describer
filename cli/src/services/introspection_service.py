@@ -73,5 +73,5 @@ class IntrospectionService:
                         description = description.model_copy(update={"ai_documentation": ai_documentation, "ai_generation_status": "generated" if ai_documentation else "failed", "ai_generation_error": None if ai_documentation else ai_service.last_error})
                     results.append(description)
                     if store:
-                        store.save_table_metadata(config, instance, schema.name, table.name, schema_description, ai_documentation, only_if_changed=request.only_if_changed)
+                        store.save_table_metadata(config, instance, schema.name, table.name, schema_description, ai_documentation, only_if_changed=request.only_if_changed, save_markdown=request.save_markdown)
         return results

@@ -8,3 +8,5 @@ class ScanRequest(BaseModel):
     schema_name: Optional[str] = None
     generate_ai_docs: bool = False
     save_metadata: bool = True
+    only_if_changed: bool = False
+    save_markdown: bool = False
