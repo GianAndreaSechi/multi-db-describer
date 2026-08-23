@@ -29,6 +29,8 @@ class ScanExecutorService:
         no_cache: bool = False,
         generate_ai_docs: bool = False,
         save_metadata: bool = True,
+        only_if_changed: bool = False,
+        save_markdown: bool = False,
     ) -> ScanExecutionResult:
         """
         Scans tables according to the given scope, stores each TableDescription
@@ -115,6 +117,8 @@ class ScanExecutorService:
                                         table_name=tbl.name,
                                         schema_description=desc_dict,
                                         ai_documentation=ai_doc,
+                                        only_if_changed=only_if_changed,
+                                        save_markdown=save_markdown,
                                     )
 
                                 result.count += 1
