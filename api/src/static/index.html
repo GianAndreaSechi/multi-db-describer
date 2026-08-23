@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -238,7 +238,7 @@ function SearchBox({ value, onChange }) {
   return (
     <div className="srch">
       <span className="srch-icon">⌕</span>
-      <input className="srch-input" type="text" value={value} onChange={e => onChange(e.target.value)} placeholder="Cerca…" />
+      <input className="srch-input" type="text" value={value} onChange={e => onChange(e.target.value)} placeholder="Search…" />
       {value && <button className="srch-clear" onClick={() => onChange('')}>×</button>}
     </div>
   );
@@ -262,9 +262,9 @@ function NavPanel({ title, icon, items, selected, onSelect, filter, onFilter,
             className={`npanel-scan-btn${scanning ? ' npanel-scan-btn--running' : ''}`}
             onClick={onScan}
             disabled={scanning}
-            title={scanning ? 'Scan in corso…' : scanLabel}
+            title={scanning ? 'Scan in progress…' : scanLabel}
           >
-            {scanning ? <><span className="spin">↻</span> In corso</> : <>▷ Scan</>}
+            {scanning ? <><span className="spin">↻</span> In progress</> : <>▷ Scan</>}
           </button>
         )}
       </div>
@@ -272,7 +272,7 @@ function NavPanel({ title, icon, items, selected, onSelect, filter, onFilter,
         <SearchBox value={filter} onChange={onFilter} />
         <ul className="nlist">
           {error && <li className="nlist-err">⚠ {error}</li>}
-          {!error && !loading && filtered.length === 0 && <li className="nlist-empty">{filter ? 'Nessun risultato' : 'Vuoto'}</li>}
+          {!error && !loading && filtered.length === 0 && <li className="nlist-empty">{filter ? 'No results' : 'Empty'}</li>}
           {filtered.map(item => (
             <li key={item} className={`nitem${selected === item ? ' nitem--on' : ''}`}
               onClick={() => onSelect(item)} title={item}>{item}</li>
@@ -312,7 +312,7 @@ function ScanStatusBar({ scan, onDismiss }) {
       <span className="scan-bar-msg">
         <strong>Scan {scan.status}</strong>
         {scan.jobId && <span style={{opacity:.7}}> · job {scan.jobId.slice(0,8)}…</span>}
-        {scan.result_count != null && <span style={{opacity:.7}}> · {scan.result_count} tabelle</span>}
+        {scan.result_count != null && <span style={{opacity:.7}}> · {scan.result_count} tables</span>}
         {scan.error && <span> — {scan.error}</span>}
       </span>
       {(scan.status === 'completed' || scan.status === 'failed') &&
@@ -358,7 +358,7 @@ function DetailPanel({ inst, db, tbl, detail, onSaved, onReload }) {
     let parsed;
     try { parsed = JSON.parse(text); } catch (e) { setJsonErr(e.message); return; }
     const payload = Object.fromEntries(Object.entries(parsed).filter(([k]) => !PROTECTED.has(k)));
-    if (!Object.keys(payload).length) { setSaveStatus('err'); setSaveMsg('Nessun campo modificabile.'); return; }
+    if (!Object.keys(payload).length) { setSaveStatus('err'); setSaveMsg('No editable fields.'); return; }
     setSaveStatus('saving');
     try {
       const updated = await apiPatch(`/metadata/${inst}/${db}/${tbl}`, payload);
@@ -382,9 +382,9 @@ function DetailPanel({ inst, db, tbl, detail, onSaved, onReload }) {
       });
       const updated = await apiFetch(`/metadata/${inst}/${db}/${tbl}`);
       if (updated._unchanged) {
-        setSaveStatus('warn'); setSaveMsg('Schema invariato, nessuna modifica salvata.');
+        setSaveStatus('warn'); setSaveMsg('Schema unchanged; no changes were saved.');
       } else {
-        onSaved(updated); setSaveStatus('ok'); setSaveMsg('Schema aggiornato dal database live.');
+        onSaved(updated); setSaveStatus('ok'); setSaveMsg('Schema updated from the live database.');
       }
       setTimeout(() => setSaveStatus(null), 4000);
     } catch (e) {
@@ -399,41 +399,41 @@ function DetailPanel({ inst, db, tbl, detail, onSaved, onReload }) {
           <div className="detail-title">{tbl}</div>
           <div className="detail-badges">
             {detail.config_name && <span className="badge">⚙ {detail.config_name}</span>}
-            {detail.updated_at  && <span className="badge">🕐 {new Date(detail.updated_at).toLocaleString('it-IT')}</span>}
+            {detail.updated_at  && <span className="badge">🕐 {new Date(detail.updated_at).toLocaleString('en-US')}</span>}
           </div>
         </div>
         <div className="detail-actions">
           {!editing ? (
             <>
               <button className="btn btn-secondary" onClick={handleRefreshSchema} disabled={refreshing || !detail.config_name}
-                title={detail.config_name ? 'Ri-descrive la tabella dal database live e aggiorna lo schema se cambiato' : 'config_name non disponibile'}>
-                {refreshing ? <><span className="spin">↻</span> Aggiornamento…</> : '↺ Aggiorna schema'}
+                title={detail.config_name ? 'Re-describe the table from the live database and update the schema if it changed' : 'config_name unavailable'}>
+                {refreshing ? <><span className="spin">↻</span> Refreshing…</> : '↺ Refresh schema'}
               </button>
-              <button className="btn btn-primary" onClick={startEdit}>Modifica</button>
+              <button className="btn btn-primary" onClick={startEdit}>Edit</button>
             </>
           ) : (
             <>
-              <button className="btn btn-ghost" onClick={() => setEditing(false)} disabled={saveStatus === 'saving'}>Annulla</button>
+              <button className="btn btn-ghost" onClick={() => setEditing(false)} disabled={saveStatus === 'saving'}>Cancel</button>
               <button className="btn btn-primary" onClick={handleSave} disabled={!!jsonErr || saveStatus === 'saving'}>
-                {saveStatus === 'saving' ? 'Salvataggio…' : 'Salva'}
+                {saveStatus === 'saving' ? 'Saving…' : 'Save'}
               </button>
             </>
           )}
         </div>
       </div>
 
-      {saveStatus === 'ok'   && <div className="alert alert-ok" >✓ {saveMsg || 'Salvato con successo'}</div>}
+      {saveStatus === 'ok'   && <div className="alert alert-ok" >✓ {saveMsg || 'Saved successfully'}</div>}
       {saveStatus === 'warn' && <div className="alert alert-warn">⚠ {saveMsg}</div>}
       {saveStatus === 'err'  && <div className="alert alert-err" >✗ {saveMsg}</div>}
 
       {editing ? (
         <div className="edit-body">
-          {jsonErr && <div className="json-err-msg">JSON non valido — {jsonErr}</div>}
+          {jsonErr && <div className="json-err-msg">Invalid JSON — {jsonErr}</div>}
           <textarea ref={taRef} className={`json-ta${jsonErr ? ' json-ta--inv' : ''}`}
             value={text} onChange={e => handleChange(e.target.value)}
             onKeyDown={handleTab} spellCheck={false} autoCorrect="off" autoCapitalize="off" />
           <p className="edit-hint">
-            Campi protetti (non modificabili):&nbsp;
+            Protected fields (not editable):&nbsp;
             {[...PROTECTED].map((f, i) => (
               <React.Fragment key={f}><code>{f}</code>{i < PROTECTED.size - 1 ? ' · ' : ''}</React.Fragment>
             ))}
@@ -453,23 +453,23 @@ function DetailPanel({ inst, db, tbl, detail, onSaved, onReload }) {
 function ScanModal({ pending, onConfirm, onCancel }) {
   const [genAi, setGenAi] = useState(false);
   const scope = pending.schema_name
-    ? `database "${pending.schema_name}" su "${pending.instance_name}"`
-    : `istanza "${pending.instance_name}"`;
+    ? `database "${pending.schema_name}" on "${pending.instance_name}"`
+    : `instance "${pending.instance_name}"`;
   return (
     <div className="scan-backdrop" onClick={onCancel}>
       <div className="scan-modal" onClick={e => e.stopPropagation()}>
-        <div className="scan-modal-title">Avvia scan</div>
+        <div className="scan-modal-title">Start scan</div>
         <div className="scan-modal-scope">Scope: {scope}</div>
         <label className="scan-modal-opt">
           <input type="checkbox" checked={genAi} onChange={e => setGenAi(e.target.checked)} />
           <div>
-            <div className="scan-modal-opt-label">Genera documentazione AI</div>
-            <div className="scan-modal-opt-note">Richiede un LLM configurato · aumenta il tempo di elaborazione</div>
+            <div className="scan-modal-opt-label">Generate AI documentation</div>
+            <div className="scan-modal-opt-note">Requires a configured LLM · increases processing time</div>
           </div>
         </label>
         <div className="scan-modal-actions">
-          <button className="btn btn-ghost" onClick={onCancel}>Annulla</button>
-          <button className="btn btn-primary" onClick={() => onConfirm(genAi)}>Avvia scan</button>
+          <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
+          <button className="btn btn-primary" onClick={() => onConfirm(genAi)}>Start scan</button>
         </div>
       </div>
     </div>
@@ -479,9 +479,9 @@ function ScanModal({ pending, onConfirm, onCancel }) {
 // ── EmptyState ────────────────────────────────────────────────────────────────
 
 function EmptyState({ inst, db }) {
-  const [icon, msg] = !inst ? ['🗂', "Seleziona un'istanza per iniziare"]
-    : !db ? ['🗄', 'Seleziona un database']
-    : ['📋', 'Seleziona una tabella per vederne i metadati'];
+  const [icon, msg] = !inst ? ['🗂', 'Select an instance to get started']
+    : !db ? ['🗄', 'Select a database']
+    : ['📋', 'Select a table to view its metadata'];
   return <div className="empty"><div className="empty-icon">{icon}</div><div className="empty-text">{msg}</div></div>;
 }
 
@@ -598,28 +598,28 @@ function App() {
         <span className="hdr-logo">◈</span>
         <span className="hdr-title">Irides DB Explorer</span>
         {selInst && <><div className="hdr-divider"/><Breadcrumb inst={selInst} db={selDb} tbl={selTbl} onInst={clearInstance} onDb={clearDatabase}/></>}
-        <button className="hdr-refresh" onClick={loadInstances} title="Ricarica istanze">
-          <span className={loading.inst ? 'spin' : ''}>↺</span> Aggiorna
+        <button className="hdr-refresh" onClick={loadInstances} title="Reload instances">
+          <span className={loading.inst ? 'spin' : ''}>↺</span> Refresh
         </button>
       </header>
 
       <div className="layout">
         <aside className="sidebar">
-          <NavPanel title="Istanze" icon="⬡"
+          <NavPanel title="Instances" icon="⬡"
             items={instances} selected={selInst} onSelect={selectInstance}
             filter={filters.inst} onFilter={v => setFilters(f => ({ ...f, inst: v }))}
             loading={loading.inst} error={errors.inst}
-            scanLabel={`Scan istanza ${selInst}`}
+            scanLabel={`Scan instance ${selInst}`}
             onScan={selInst ? () => setPendingScan({ instance_name: selInst, schema_name: null, level: 'inst' }) : null}
             scanning={scanningInst} />
-          <NavPanel title="Database" icon="▤"
+          <NavPanel title="Databases" icon="▤"
             items={databases} selected={selDb} onSelect={selectDatabase}
             filter={filters.db} onFilter={v => setFilters(f => ({ ...f, db: v }))}
             loading={loading.db} error={errors.db} disabled={!selInst}
             scanLabel={`Scan database ${selDb}`}
             onScan={selDb ? () => setPendingScan({ instance_name: selInst, schema_name: selDb, level: 'db' }) : null}
             scanning={scanningDb} />
-          <NavPanel title="Tabelle" icon="▦"
+          <NavPanel title="Tables" icon="▦"
             items={tables} selected={selTbl} onSelect={selectTable}
             filter={filters.tbl} onFilter={v => setFilters(f => ({ ...f, tbl: v }))}
             loading={loading.tbl} error={errors.tbl} disabled={!selDb} />
@@ -631,7 +631,7 @@ function App() {
                 inst={selInst} db={selDb} tbl={selTbl}
                 detail={detail} onSaved={setDetail} />
             : <EmptyState inst={selInst} db={selDb} />}
-          {loading.detail && !detail && <div className="overlay"><div className="loader" /> Caricamento…</div>}
+          {loading.detail && !detail && <div className="overlay"><div className="loader" /> Loading…</div>}
           <ScanStatusBar scan={activeScan} onDismiss={() => { setActiveScan(null); setScanningInst(false); setScanningDb(false); }} />
         </main>
       </div>
