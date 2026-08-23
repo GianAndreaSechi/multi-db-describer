@@ -22,3 +22,7 @@ class DescribeTableRequest(BaseModel):
         default=False,
         description="When save_metadata=True, skip writing if schema_description is unchanged. Preserves updated_at and avoids noise.",
     )
+    save_markdown: bool = Field(
+        default=False,
+        description="Save an LLM-friendly Markdown document alongside persisted JSON metadata.",
+    )

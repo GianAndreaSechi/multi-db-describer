@@ -16,6 +16,8 @@ class ScanService:
         no_cache: bool = False,
         generate_ai_docs: bool = False,
         save_metadata: bool = True,
+        only_if_changed: bool = False,
+        save_markdown: bool = False,
     ) -> ScanJob:
         scope = ScanScope(
             config_name=config_name,
@@ -24,6 +26,8 @@ class ScanService:
             no_cache=no_cache,
             generate_ai_docs=generate_ai_docs,
             save_metadata=save_metadata,
+            only_if_changed=only_if_changed,
+            save_markdown=save_markdown,
         )
         return self.job_store.enqueue(scope)
 
