@@ -35,11 +35,14 @@ irides instances --config sales_mysql
 irides schemas --config sales_mysql --instance db1.company.com
 irides tables --config sales_mysql --instance db1.company.com --schema production --limit 50
 irides describe --config sales_mysql --instance db1.company.com --schema production --table orders
+irides describe --config sales_mysql --instance db1.company.com --schema production --table orders --generate-ai-docs --save-markdown
 ```
 
 Omitting `--config`, `--instance`, `--schema`, or `--table` expands the scope, just like the corresponding API endpoints. Results are always written as JSON to stdout; errors are written to stderr. Add `--no-cache` to introspection commands to bypass Redis.
 
-`describe` saves metadata by default. Available options: `--no-save-metadata`, `--only-if-changed`, and `--generate-ai-docs`.
+`describe` saves metadata by default. Available options: `--no-save-metadata`, `--only-if-changed`, `--generate-ai-docs`, and `--save-markdown`.
+
+`--save-markdown` writes an LLM-friendly `<table>.md` file next to the JSON metadata. It includes the source scope, schema, columns, keys, and AI documentation when available.
 
 ## Metadata
 
