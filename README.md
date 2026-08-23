@@ -2,10 +2,10 @@
 
 A unified, asynchronous database introspection layer designed to help LLMs and applications extract, summarize, and understand schemas across heterogeneous data stores.
 
-Version: v0.3.1
 ---
 
 ## Overview
+<b>Version: v0.4.0-alpha</b>
 
 When building AI agents or data tools across multiple databases, a primary challenge is providing accurate, low-overhead schema context. Without proper grounding, LLMs frequently hallucinate column names, infer non-existent relationships, or generate invalid SQL/NoSQL queries.
 
