@@ -1,0 +1,65 @@
+# Iride CLI
+
+Command-line interface for database introspection, built only on the `core` package and Python's standard library. It does not require FastAPI, MCP, or the Redis worker.
+
+## Structure
+
+The CLI is organized by responsibility:
+
+- `src/presentation/`: command definitions and `argparse` parsing;
+- `src/controllers/`: maps command-line arguments to use cases;
+- `src/dto/`: immutable, typed request DTOs;
+- `src/services/`: live introspection and metadata operations using only `core`;
+- `src/main.py`: composition root, JSON serialization, and process-level error handling.
+
+## Local installation
+
+```bash
+pip install -e ./core -e ./cli
+```
+
+Target configuration is shared with the rest of the project: use `DB_TARGETS` and the corresponding `DB_TARGET_<NAME>_*` variables.
+
+Create a local configuration before running the CLI:
+
+```bash
+cp cli/.env.example cli/.env
+```
+
+## Commands
+
+```bash
+irides configurations
+irides connect sales_mysql
+irides instances --config sales_mysql
+irides schemas --config sales_mysql --instance db1.company.com
+irides tables --config sales_mysql --instance db1.company.com --schema production --limit 50
+irides describe --config sales_mysql --instance db1.company.com --schema production --table orders
+```
+
+Omitting `--config`, `--instance`, `--schema`, or `--table` expands the scope, just like the corresponding API endpoints. Results are always written as JSON to stdout; errors are written to stderr. Add `--no-cache` to introspection commands to bypass Redis.
+
+`describe` saves metadata by default. Available options: `--no-save-metadata`, `--only-if-changed`, and `--generate-ai-docs`.
+
+## Metadata
+
+```bash
+irides metadata instances
+irides metadata databases db1.company.com
+irides metadata tables db1.company.com production
+irides metadata get db1.company.com production orders
+irides metadata update db1.company.com production orders '{"owner":"data-team","tags":["billing"]}'
+```
+
+The CLI does not include `scan` commands. They are asynchronous and explicitly require Redis Streams and the `worker` service.
+
+## Docker
+
+The CLI reads its configuration from `cli/.env` and uses the shared Redis network. Start by copying `.env.example` as shown above and configure at least one `DB_TARGETS` entry.
+
+```bash
+docker compose -f infra/docker-compose.infra.yml up -d
+docker compose -f cli/docker-compose.yml run --rm irides-cli configurations
+docker compose -f cli/docker-compose.yml run --rm irides-cli tables --config sales_mysql --schema public
+docker compose -f cli/docker-compose.yml run --rm irides-cli describe --config sales_mysql --schema public --table orders
+```
