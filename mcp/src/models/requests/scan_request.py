@@ -14,3 +14,5 @@ class ScanRequest(BaseModel):
         ),
     )
     save_metadata: bool = Field(default=True, description="Persist generated metadata.")
+    only_if_changed: bool = Field(default=False, description="Skip metadata writes when the schema has not changed.")
+    save_markdown: bool = Field(default=False, description="Save an LLM-friendly Markdown document alongside JSON metadata.")

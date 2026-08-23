@@ -34,3 +34,11 @@ class DescribeTableRequest(BaseModel):
         default=True,
         description="Persist schema and AI documentation metadata when describing tables.",
     )
+    only_if_changed: bool = Field(
+        default=False,
+        description="Skip metadata writes when the schema has not changed.",
+    )
+    save_markdown: bool = Field(
+        default=False,
+        description="Save an LLM-friendly Markdown document alongside JSON metadata.",
+    )
