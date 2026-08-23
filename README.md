@@ -2,6 +2,7 @@
 
 A unified, asynchronous database introspection layer designed to help LLMs and applications extract, summarize, and understand schemas across heterogeneous data stores.
 
+Version: v0.3.1
 ---
 
 ## Overview
@@ -405,4 +406,5 @@ for col in table_desc.columns:
   - [x] Web UI for metadata browsing and editing (`/ui`)
   - [x] `only_if_changed` flag on describe/scan to avoid overwriting unchanged schemas
   - [x] Custom field preservation across re-describes
+  - [x] Create cli
   - [ ] Refactoring code and moving hardcoded values to constants/config files.
