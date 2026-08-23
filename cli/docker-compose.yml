@@ -1,0 +1,36 @@
+version: '3.8'
+
+# Run the shared infrastructure first when Redis caching is wanted:
+#   docker compose -f ../infra/docker-compose.infra.yml up -d
+#
+# Examples:
+#   docker compose run --rm irides-cli configurations
+#   docker compose run --rm irides-cli tables --config sales_mysql --schema public
+
+services:
+  irides-cli:
+    build:
+      context: ..
+      dockerfile: cli/Dockerfile
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_TTL_SECONDS: 86400
+      REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS: 2
+      REDIS_CACHE_SOCKET_TIMEOUT_SECONDS: 2
+      CACHE_KEY_PREFIX: irides
+      STORAGE_METADATA_DIR: /app/storage/metadata
+      # Reuse the same DB targets configured for API and worker.
+      DB_CONFIG_FILE: /app/api/.env
+    networks:
+      - irides-net
+    volumes:
+      - ../cli:/app/cli
+      - ../core:/app/core
+      - ../api:/app/api:ro
+      - ../storage:/app/storage
+
+networks:
+  irides-net:
+    external: true
