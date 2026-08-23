@@ -28,11 +28,15 @@ class BaseMetadataStore(ABC):
         table_name: str,
         schema_description: Dict[str, Any],
         ai_documentation: Optional[Dict[str, Any]] = None,
+        only_if_changed: bool = False,
+        save_markdown: bool = False,
     ) -> Dict[str, Any]:
         """Save or update table metadata.
 
         Must preserve existing ai_documentation if ai_documentation is None.
         Must keep schema_description and ai_documentation in separate top-level fields.
+        When ``save_markdown`` is true, implementations should persist an
+        LLM-friendly Markdown representation alongside the metadata.
         """
         raise NotImplementedError
 
@@ -102,6 +106,62 @@ class FileMetadataStore(BaseMetadataStore):
         safe_table = self._sanitize(table_name)
         return self.base_dir / safe_config / safe_instance / safe_schema / f"{safe_table}.json"
 
+    def _get_markdown_file_path(
+        self, config_name: str, instance_name: str, schema_name: str, table_name: str
+    ) -> Path:
+        return self._get_file_path(config_name, instance_name, schema_name, table_name).with_suffix(".md")
+
+    @staticmethod
+    def _markdown_escape(value: Any) -> str:
+        return str("" if value is None else value).replace("|", "\\|").replace("\n", " ")
+
+    def _render_markdown(self, record: Dict[str, Any]) -> str:
+        """Render a compact, self-contained schema document for LLM ingestion."""
+        schema = record["schema_description"]
+        lines = [
+            f"# {record['schema_name']}.{record['table_name']}",
+            "",
+            "## Source",
+            "",
+            f"- Configuration: `{record['config_name']}`",
+            f"- Instance: `{record['instance_name']}`",
+            f"- Schema: `{record['schema_name']}`",
+            f"- Table: `{record['table_name']}`",
+            f"- Metadata updated: `{record['updated_at']}`",
+        ]
+        ai_doc = record.get("ai_documentation") or {}
+        if ai_doc.get("summary"):
+            lines.extend(["", "## AI documentation", "", ai_doc["summary"]])
+
+        columns = schema.get("columns", [])
+        if columns:
+            lines.extend(["", "## Columns", "", "| Name | Type | Nullable | Description |", "| --- | --- | --- | --- |"])
+            descriptions = ai_doc.get("column_descriptions", {})
+            for column in columns:
+                lines.append(
+                    "| {name} | {data_type} | {nullable} | {description} |".format(
+                        name=self._markdown_escape(column.get("name")),
+                        data_type=self._markdown_escape(column.get("data_type")),
+                        nullable=self._markdown_escape(column.get("is_nullable")),
+                        description=self._markdown_escape(descriptions.get(column.get("name"))),
+                    )
+                )
+
+        primary_key = schema.get("primary_key") or {}
+        key_columns = primary_key.get("column_names", []) if isinstance(primary_key, dict) else []
+        if key_columns:
+            lines.extend(["", "## Primary key", "", ", ".join(f"`{column}`" for column in key_columns)])
+        if schema.get("foreign_keys"):
+            lines.extend(["", "## Foreign keys", ""])
+            for key in schema["foreign_keys"]:
+                lines.append(f"- `{key.get('column_name')}` → `{key.get('referenced_table')}.{key.get('referenced_column')}`")
+        return "\n".join(lines) + "\n"
+
+    def _save_markdown(self, record: Dict[str, Any]) -> None:
+        path = self._get_markdown_file_path(record["config_name"], record["instance_name"], record["schema_name"], record["table_name"])
+        path.write_text(self._render_markdown(record), encoding="utf-8")
+        logger.info(f"FileMetadataStore: Saved Markdown metadata for {record['table_name']} -> {path}")
+
     def get_table_metadata(
         self,
         config_name: str,
@@ -134,6 +194,7 @@ class FileMetadataStore(BaseMetadataStore):
         schema_description: Dict[str, Any],
         ai_documentation: Optional[Dict[str, Any]] = None,
         only_if_changed: bool = False,
+        save_markdown: bool = False,
     ) -> Dict[str, Any]:
         file_path = self._get_file_path(config_name, instance_name, schema_name, table_name)
         file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -143,6 +204,8 @@ class FileMetadataStore(BaseMetadataStore):
         # Skip write if schema is unchanged (preserves updated_at and avoids noise)
         if only_if_changed and existing_data:
             if existing_data.get("schema_description") == schema_description:
+                if save_markdown:
+                    self._save_markdown(existing_data)
                 logger.info(f"FileMetadataStore: No schema change for {table_name}, skipping write.")
                 return {**existing_data, "_unchanged": True}
 
@@ -175,6 +238,8 @@ class FileMetadataStore(BaseMetadataStore):
         except Exception as e:
             logger.error(f"FileMetadataStore: Failed to write {file_path}: {e}")
 
+        if save_markdown:
+            self._save_markdown(metadata_record)
         return metadata_record
 
 
