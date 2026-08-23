@@ -20,6 +20,12 @@ pip install -e ./core -e ./cli
 
 Target configuration is shared with the rest of the project: use `DB_TARGETS` and the corresponding `DB_TARGET_<NAME>_*` variables.
 
+Create a local configuration before running the CLI:
+
+```bash
+cp cli/.env.example cli/.env
+```
+
 ## Commands
 
 ```bash
@@ -49,7 +55,7 @@ The CLI does not include `scan` commands. They are asynchronous and explicitly r
 
 ## Docker
 
-The CLI reuses the API database configuration (`api/.env`) and the shared Redis network.
+The CLI reads its configuration from `cli/.env` and uses the shared Redis network. Start by copying `.env.example` as shown above and configure at least one `DB_TARGETS` entry.
 
 ```bash
 docker compose -f infra/docker-compose.infra.yml up -d

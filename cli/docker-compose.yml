@@ -21,14 +21,12 @@ services:
       REDIS_CACHE_SOCKET_TIMEOUT_SECONDS: 2
       CACHE_KEY_PREFIX: irides
       STORAGE_METADATA_DIR: /app/storage/metadata
-      # Reuse the same DB targets configured for API and worker.
-      DB_CONFIG_FILE: /app/api/.env
+      DB_CONFIG_FILE: /app/cli/.env
     networks:
       - irides-net
     volumes:
       - ../cli:/app/cli
       - ../core:/app/core
-      - ../api:/app/api:ro
       - ../storage:/app/storage
 
 networks:
