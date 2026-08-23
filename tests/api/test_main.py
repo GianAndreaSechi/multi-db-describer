@@ -196,6 +196,13 @@ class TestDescribeEndpoint:
         )
         assert resp.status_code == 200
 
+    def test_save_markdown_param_forwarded(self, client):
+        with patch("api.src.main.describe_table_service") as service:
+            service.describe_table.return_value = [_FAKE_TABLE_DESC]
+            resp = client.post("/api/v1/describe", json={"save_markdown": True})
+        assert resp.status_code == 200
+        assert service.describe_table.call_args.kwargs["save_markdown"] is True
+
 
 class TestScanEndpoints:
     def test_enqueue_returns_202(self, client):
@@ -205,6 +212,14 @@ class TestScanEndpoints:
         )
         assert resp.status_code == 202
         assert resp.json()["data"]["job_id"] == "test-job-id"
+
+    def test_scan_options_forwarded(self, client):
+        with patch("api.src.main.scan_service") as service:
+            service.enqueue_scan.return_value = _FAKE_JOB
+            resp = client.post("/api/v1/scan", json={"only_if_changed": True, "save_markdown": True})
+        assert resp.status_code == 202
+        assert service.enqueue_scan.call_args.kwargs["only_if_changed"] is True
+        assert service.enqueue_scan.call_args.kwargs["save_markdown"] is True
 
     def test_get_scan_job(self, client):
         resp = client.get("/api/v1/scan/test-job-id")
