@@ -43,6 +43,18 @@ class ScanExecutorService:
             else self.config_service.get_available_configurations()
         )
 
+        # When instance_name is known but config_name is not, skip configs whose
+        # explicitly-configured hosts don't include that instance.  Flat configs
+        # (Athena/DynamoDB/Trino — no "hosts" key) are always kept because their
+        # instances are discovered at runtime.
+        if instance_name and not config_name:
+            filtered = []
+            for c in config_names:
+                configured_hosts = self.config_service._get_hosts(c)
+                if not configured_hosts or instance_name in configured_hosts:
+                    filtered.append(c)
+            config_names = filtered
+
         metadata_store = get_metadata_store() if save_metadata else None
         ai_service = AIDocumentationService() if generate_ai_docs else None
         logger.info(
