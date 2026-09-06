@@ -20,6 +20,7 @@ services:
       SCAN_RESULTS_TTL_SECONDS: 604800   # 7 days
       WORKER_STREAM_BLOCK_MS: 5000
       STORAGE_METADATA_DIR: /app/storage/metadata
+      STORAGE_EXPORT_DIR: /app/storage/exports
       DB_CONFIG_FILE: /app/worker/.env
       LITELLM_MODEL: ${LITELLM_MODEL:-gpt-4o-mini}
       LITELLM_API_KEY: ${LITELLM_API_KEY:-}
@@ -31,6 +32,7 @@ services:
     volumes:
       - ../core:/app/core
       - ../worker:/app/worker
+      - ../storage:/app/storage
     restart: always
 
 networks:
