@@ -24,7 +24,9 @@ class DescribeRequest(TablesRequest):
     generate_ai_docs: bool = False
     save_metadata: bool = True
     only_if_changed: bool = False
-    save_markdown: bool = False
+    export_markdown: bool = True
+    export_okf: bool = True
+    preformat: bool = True
 
 
 @dataclass(frozen=True)
