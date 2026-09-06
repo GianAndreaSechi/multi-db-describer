@@ -1,11 +1,24 @@
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from .export_options import ExportOptions
 
 
 class DescribeTableRequest(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_save_markdown(cls, data):
+        if isinstance(data, dict) and "export_options" not in data and "save_markdown" in data:
+            data = dict(data)
+            data["export_options"] = {
+                "formats": ["markdown"] if data["save_markdown"] else [],
+                "preformat": True,
+            }
+        return data
+
     config_name: Optional[str] = Field(
         default=None,
-        description="Configured database target name, e.g. 'mysql_publishers_dev'.",
+        description="Configured database target name, e.g. 'mysql_primary'.",
     )
     instance_name: Optional[str] = Field(
         default=None,
@@ -38,7 +51,7 @@ class DescribeTableRequest(BaseModel):
         default=False,
         description="Skip metadata writes when the schema has not changed.",
     )
-    save_markdown: bool = Field(
-        default=False,
-        description="Save an LLM-friendly Markdown document alongside JSON metadata.",
+    export_options: ExportOptions = Field(
+        default_factory=ExportOptions,
+        description="Markdown and OKF exports with essential preformatting, enabled by default.",
     )

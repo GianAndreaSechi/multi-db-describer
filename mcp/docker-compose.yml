@@ -18,6 +18,7 @@ services:
       CACHE_KEY_PREFIX: irides
       DB_CONFIG_FILE: /app/api/.env
       STORAGE_METADATA_DIR: /app/storage/metadata
+      STORAGE_EXPORT_DIR: /app/storage/exports
     networks:
       - irides-net
     volumes:
@@ -59,6 +60,7 @@ services:
       SCAN_RESULTS_TTL_SECONDS: 604800
       WORKER_STREAM_BLOCK_MS: 5000
       STORAGE_METADATA_DIR: /app/storage/metadata
+      STORAGE_EXPORT_DIR: /app/storage/exports
       # The worker must receive exactly the same DB configuration as the API.
       DB_CONFIG_FILE: /app/api/.env
     networks:

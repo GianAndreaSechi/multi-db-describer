@@ -19,7 +19,7 @@ def register_tools(mcp):
         Get configured database target names from the API service.
 
         The returned values are config_name values to pass to the other tools,
-        for example 'mysql_publishers_dev'. They are not network hosts and not
+        for example 'mysql_primary'. They are not network hosts and not
         connector types like 'mysql'.
         """
         logger.info("MCP: Fetching available database configurations from API service.")
@@ -38,7 +38,7 @@ def register_tools(mcp):
         """
         List database instances for configured targets by calling the API service.
 
-        Use config_name for the configured target, e.g. 'mysql_publishers_dev'.
+        Use config_name for the configured target, e.g. 'mysql_primary'.
         For MySQL, returned instance names are the configured MySQL hosts.
         """
         logger.info(f"MCP: Listing instances for config '{request.config_name}' via API service.")
@@ -57,7 +57,7 @@ def register_tools(mcp):
         """
         List schemas/databases for a configured target and instance by calling the API service.
 
-        Use config_name for the configured target, e.g. 'mysql_publishers_dev'.
+        Use config_name for the configured target, e.g. 'mysql_primary'.
         Use instance_name from list_instances; for MySQL this is the configured MySQL host.
         """
         logger.info(f"MCP: Listing schemas for instance '{request.instance_name}' in config '{request.config_name}' via API.")
@@ -99,10 +99,13 @@ def register_tools(mcp):
         schema_name for the database/schema, and table_name for a specific table.
         Set generate_ai_docs=True whenever the user asks for AI analysis,
         AI documentation, business documentation, or an AI-generated explanation.
+        Markdown and OKF exports with essential preformatting are enabled by default;
+        pass an empty formats list or preformat=False to opt out explicitly.
         """
         logger.info(
             f"MCP: Describing table '{request.table_name}' in schema '{request.schema_name}' via API "
-            f"(generate_ai_docs={request.generate_ai_docs}, save_metadata={request.save_metadata})."
+            f"(generate_ai_docs={request.generate_ai_docs}, save_metadata={request.save_metadata}, "
+            f"export_options={request.export_options.model_dump(mode='json')})."
         )
         response_format = TOON_RESPONSE_FORMAT
         api_response = await api_client.post("/describe", payload=request.model_dump(), no_cache=no_cache, response_format=response_format)

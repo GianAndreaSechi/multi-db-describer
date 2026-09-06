@@ -28,6 +28,8 @@ def register_tools(mcp):
             Set this to True whenever the user asks for AI analysis,
             AI documentation, business documentation, or an AI-generated explanation.
           - save_metadata: persist generated metadata to the configured storage.
+          - export_options: Markdown and OKF with essential preformatting are enabled by default.
+            Pass formats=[] or preformat=False to opt out explicitly.
         
         Cache:
           - no_cache: if True, bypasses existing cache and forces a fresh scan.
@@ -35,7 +37,8 @@ def register_tools(mcp):
         logger.info(
             f"MCP: Enqueueing scan job "
             f"[config={request.config_name}, instance={request.instance_name}, schema={request.schema_name}, "
-            f"generate_ai_docs={request.generate_ai_docs}, save_metadata={request.save_metadata}, no_cache={no_cache}]"
+            f"generate_ai_docs={request.generate_ai_docs}, save_metadata={request.save_metadata}, "
+            f"export_options={request.export_options.model_dump(mode='json')}, no_cache={no_cache}]"
         )
         api_response = await api_client.post(
             "/scan",
