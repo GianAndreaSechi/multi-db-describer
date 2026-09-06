@@ -35,11 +35,36 @@ class ConfigService:
     def _get_hosts(self, config_name: str) -> List[str]:
         """Return explicitly configured connection hosts, when present.
 
-        Some connectors (Athena, DynamoDB and Trino) discover their instances
-        remotely, so their configuration has no ``hosts`` collection.
+        Configurations may use either a multi-host ``hosts`` collection or a
+        flat ``host`` connection parameter. Connectors such as Athena and
+        DynamoDB discover instances remotely and expose neither.
         """
         details = self._get_connector_details(config_name)
-        return [h["host"] for h in details["connection_params"].get("hosts", [])]
+        connection_params = details["connection_params"]
+        hosts = [item["host"] for item in connection_params.get("hosts", [])]
+        if hosts:
+            return hosts
+        return [connection_params["host"]] if connection_params.get("host") else []
+
+    def configuration_matches_instance(
+        self, config_name: str, instance_name: str, no_cache: bool = False
+    ) -> bool:
+        """Return whether an instance belongs to a database configuration."""
+        configured_hosts = self._get_hosts(config_name)
+        if configured_hosts:
+            return instance_name in configured_hosts
+        return instance_name in {
+            instance.name for instance in self.list_instances(config_name, no_cache=no_cache)
+        }
+
+    def resolve_configurations_for_instance(
+        self, instance_name: str, no_cache: bool = False
+    ) -> List[str]:
+        return [
+            config_name
+            for config_name in self.get_available_configurations()
+            if self.configuration_matches_instance(config_name, instance_name, no_cache)
+        ]
 
     def _get_connector_for_host(self, config_name: str, host: str):
         details = self._get_connector_details(config_name)

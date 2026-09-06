@@ -21,6 +21,7 @@ import redis
 from loguru import logger
 
 from core.db_connector.models.scan_job import ScanJob, ScanScope, ScanStatus
+from core.db_connector.exporting import ExportOptions
 
 STREAM_KEY_SUFFIX = "scan:queue"
 JOB_KEY_SUFFIX = "scan:job"
@@ -71,7 +72,8 @@ class JobStore:
             "generate_ai_docs": "true" if job.scope.generate_ai_docs else "false",
             "save_metadata":    "true" if job.scope.save_metadata else "false",
             "only_if_changed":  "true" if job.scope.only_if_changed else "false",
-            "save_markdown":    "true" if job.scope.save_markdown else "false",
+            "export_formats":   json.dumps([item.value for item in job.scope.export_options.formats]),
+            "export_preformat": "true" if job.scope.export_options.preformat else "false",
             "created_at":       _str(job.created_at),
             "started_at":       _str(job.started_at),
             "completed_at":     _str(job.completed_at),
@@ -85,6 +87,17 @@ class JobStore:
         def _dt(val: str) -> Optional[datetime]:
             return datetime.fromisoformat(val) if val else None
 
+        export_options = ExportOptions()
+        if "export_formats" in fields:
+            export_options = ExportOptions(
+                formats=json.loads(fields["export_formats"]),
+                preformat=fields.get("export_preformat", "true") == "true",
+            )
+        elif "save_markdown" in fields:
+            export_options = ExportOptions(
+                formats=["markdown"] if fields["save_markdown"] == "true" else []
+            )
+
         return ScanJob(
             job_id=fields["job_id"],
             status=ScanStatus(fields["status"]),
@@ -96,7 +109,7 @@ class JobStore:
                 generate_ai_docs=fields.get("generate_ai_docs") == "true",
                 save_metadata=fields.get("save_metadata", "true") == "true",
                 only_if_changed=fields.get("only_if_changed") == "true",
-                save_markdown=fields.get("save_markdown") == "true",
+                export_options=export_options,
             ),
             created_at=_dt(fields.get("created_at", "")),
             started_at=_dt(fields.get("started_at", "")),
@@ -170,7 +183,8 @@ class JobStore:
             "generate_ai_docs": fields["generate_ai_docs"],
             "save_metadata":    fields["save_metadata"],
             "only_if_changed":  fields["only_if_changed"],
-            "save_markdown":    fields["save_markdown"],
+            "export_formats":   fields["export_formats"],
+            "export_preformat": fields["export_preformat"],
         })
         pipe.execute()
 

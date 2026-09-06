@@ -11,4 +11,4 @@ trino
 litellm
 fakeredis
 httpx
-
+PyYAML
