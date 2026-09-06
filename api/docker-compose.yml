@@ -20,6 +20,7 @@ services:
       REDIS_CACHE_SOCKET_TIMEOUT_SECONDS: 2
       CACHE_KEY_PREFIX: irides
       STORAGE_METADATA_DIR: /app/storage/metadata
+      STORAGE_EXPORT_DIR: /app/storage/exports
       DB_CONFIG_FILE: /app/api/.env
       LITELLM_MODEL: ${LITELLM_MODEL:-gpt-4o-mini}
       LITELLM_API_KEY: ${LITELLM_API_KEY:-}
@@ -31,6 +32,7 @@ services:
     volumes:
       - ../api:/app/api
       - ../core:/app/core
+      - ../storage:/app/storage
     restart: always
 
 networks:

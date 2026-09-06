@@ -5,5 +5,5 @@ from pydantic import BaseModel, Field
 class InstanceRequest(BaseModel):
     config_name: Optional[str] = Field(
         default=None,
-        description="Configured database target name, e.g. 'mysql_publishers_dev'.",
+        description="Configured database target name, e.g. 'mysql_primary'.",
     )

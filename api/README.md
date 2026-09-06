@@ -17,19 +17,18 @@ All routes are versioned under `/api/v1`.
 | `POST` | `/api/v1/instances` | `config_name?` | List database instances. Omit `config_name` to list all active configurations |
 | `POST` | `/api/v1/schemas` | `config_name?`, `instance_name?` | List schemas/databases. Omitted fields expand the scope |
 | `POST` | `/api/v1/tables` | `config_name?`, `instance_name?`, `schema_name?`, `limit?`, `offset?` | List tables. Omitted scope fields expand the query |
-| `POST` | `/api/v1/describe` | `config_name?`, `instance_name?`, `schema_name?`, `table_name?`, `generate_ai_docs?`, `save_metadata?`, `only_if_changed?`, `save_markdown?` | Describe table structure and optional AI documentation |
+| `POST` | `/api/v1/describe` | `config_name?`, `instance_name?`, `schema_name?`, `table_name?`, `generate_ai_docs?`, `save_metadata?`, `only_if_changed?` | Describe table structure and optional AI documentation |
 
 - **Bypass Redis Cache**: Send header `no-cache: true`.
 - **TOON Payload Format**: Send header `Accept: application/toon` for LLM token reduction.
 - **AI Documentation**: Send `generate_ai_docs: true` to include `ai_documentation`, `ai_generation_status`, and `ai_generation_error` in described tables. If `save_metadata: true`, the same AI documentation is persisted in metadata storage.
 - **`only_if_changed`**: When `save_metadata: true`, skips writing the metadata file if `schema_description` is identical to the stored version. Preserves `updated_at` and human annotations unchanged. Defaults to `false`.
-- **`save_markdown`**: When `save_metadata: true`, writes an LLM-friendly `<table>.md` file next to the JSON metadata. It includes scope, columns, keys, and AI documentation when generated. Defaults to `false`.
 
 ### Async Table Scan Jobs
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/v1/scan` | Enqueue an async scan job — returns `job_id` immediately (HTTP 202 Accepted). Supports `only_if_changed` and `save_markdown` as well as the describe options. |
+| `POST` | `/api/v1/scan` | Enqueue an async scan job — returns `job_id` immediately (HTTP 202 Accepted) |
 | `GET` | `/api/v1/scan/{job_id}` | Retrieve job status; add `?include_results=true` for full `TableDescription` list |
 | `GET` | `/api/v1/scans?limit=50` | List recent scan jobs (newest first, lightweight metadata) |
 
@@ -42,9 +41,7 @@ Scan scope & AI doc options (all optional):
   "instance_name": "db1.company.com",
   "schema_name": "production",
   "generate_ai_docs": true,
-  "save_metadata": true,
-  "only_if_changed": true,
-  "save_markdown": true
+  "save_metadata": true
 }
 ```
 
