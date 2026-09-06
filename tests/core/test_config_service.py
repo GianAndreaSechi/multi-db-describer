@@ -63,6 +63,23 @@ class TestGetConnectorDetails:
         assert "connection_params" in details
 
 
+class TestGetHosts:
+    def test_returns_multi_host_values(self, config_service):
+        assert config_service._get_hosts("mysql_dev") == ["mysql-dev.local"]
+
+    def test_returns_flat_host_value(self, config_service):
+        assert config_service._get_hosts("pg_dev") == ["pg-dev.local"]
+
+
+class TestConfigurationMatchesInstance:
+    def test_matches_only_the_owning_configuration(self, config_service):
+        assert config_service.configuration_matches_instance("mysql_dev", "mysql-dev.local") is True
+        assert config_service.configuration_matches_instance("pg_dev", "mysql-dev.local") is False
+
+    def test_resolves_configuration_from_instance(self, config_service):
+        assert config_service.resolve_configurations_for_instance("mysql-dev.local") == ["mysql_dev"]
+
+
 class TestListInstances:
     def test_multi_host_config(self, config_service, mock_connector):
         instances = config_service.list_instances("mysql_dev")

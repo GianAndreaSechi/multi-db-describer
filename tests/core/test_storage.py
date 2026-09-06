@@ -1,5 +1,8 @@
 import time
+import stat
 import pytest
+import yaml
+from core.db_connector.exporting import ExportFormat, ExportOptions
 from core.db_connector.storage import FileMetadataStore, build_metadata_key
 
 
@@ -96,6 +99,109 @@ class TestFileMetadataStoreGetSave:
         assert expected.exists()
 
 
+class TestExports:
+    def test_markdown_and_okf_are_generated_by_default(self, store, tmp_path):
+        store.save_table_metadata("cfg", "inst", "sch", "users", SCHEMA_DESC)
+
+        markdown = tmp_path / "exports" / "markdown" / "cfg" / "inst" / "sch" / "users.md"
+        okf = tmp_path / "exports" / "okf" / "catalog" / "cfg" / "inst" / "sch" / "users.md"
+        index = tmp_path / "exports" / "okf" / "catalog" / "index.md"
+        assert markdown.exists()
+        assert okf.exists()
+        assert index.exists()
+        assert stat.S_IMODE(markdown.stat().st_mode) == 0o644
+        assert stat.S_IMODE(okf.stat().st_mode) == 0o644
+        assert stat.S_IMODE(index.stat().st_mode) == 0o644
+
+    def test_okf_has_required_frontmatter(self, store, tmp_path):
+        store.save_table_metadata("cfg", "inst", "sch", "users", SCHEMA_DESC)
+        path = tmp_path / "exports" / "okf" / "catalog" / "cfg" / "inst" / "sch" / "users.md"
+        content = path.read_text(encoding="utf-8")
+        _, frontmatter_text, body = content.split("---", 2)
+        frontmatter = yaml.safe_load(frontmatter_text)
+
+        assert frontmatter["type"] == "Database Table"
+        assert frontmatter["title"] == "sch.users"
+        assert frontmatter["generated"]["by"] == "irides/0.1.0"
+        assert "# Schema" in body
+
+    def test_formats_can_be_disabled_explicitly(self, store, tmp_path):
+        store.save_table_metadata(
+            "cfg",
+            "inst",
+            "sch",
+            "users",
+            SCHEMA_DESC,
+            export_options=ExportOptions(formats=[]),
+        )
+
+        assert not (tmp_path / "exports").exists()
+
+    def test_single_format_can_be_selected(self, store, tmp_path):
+        store.save_table_metadata(
+            "cfg",
+            "inst",
+            "sch",
+            "users",
+            SCHEMA_DESC,
+            export_options=ExportOptions(formats=[ExportFormat.OKF]),
+        )
+
+        assert not (tmp_path / "exports" / "markdown").exists()
+        assert (tmp_path / "exports" / "okf" / "catalog" / "index.md").exists()
+
+    def test_export_does_not_require_json_persistence(self, store, tmp_path):
+        store.save_table_metadata(
+            "cfg",
+            "inst",
+            "sch",
+            "users",
+            SCHEMA_DESC,
+            save_metadata=False,
+        )
+
+        assert store.get_table_metadata("cfg", "inst", "sch", "users") is None
+        assert (tmp_path / "exports" / "markdown" / "cfg" / "inst" / "sch" / "users.md").exists()
+
+    def test_preformatter_is_enabled_by_default(self, store, tmp_path):
+        schema = {
+            **SCHEMA_DESC,
+            "columns": [{"name": "id", "data_type": "int", "default_value": "nextval('users')"}],
+            "indexes": [
+                {"name": "idx_users", "column_names": ["id"], "is_unique": False, "is_primary": False},
+                {"name": "uq_users_id", "column_names": ["id"], "is_unique": True, "is_primary": False},
+            ],
+        }
+        store.save_table_metadata("cfg", "inst", "sch", "users", schema)
+        markdown_path = tmp_path / "exports" / "markdown" / "cfg" / "inst" / "sch" / "users.md"
+        okf_path = tmp_path / "exports" / "okf" / "catalog" / "cfg" / "inst" / "sch" / "users.md"
+        markdown = markdown_path.read_text(encoding="utf-8")
+        okf = okf_path.read_text(encoding="utf-8")
+
+        assert "nextval" not in markdown
+        assert "idx_users" not in markdown
+        assert "idx_users" not in okf
+        assert "uq_users_id" in markdown
+        assert "uq_users_id" in okf
+
+    def test_preformatter_can_be_disabled(self, store, tmp_path):
+        schema = {
+            **SCHEMA_DESC,
+            "indexes": [{"name": "idx_users", "column_names": ["id"], "is_unique": False}],
+        }
+        store.save_table_metadata(
+            "cfg",
+            "inst",
+            "sch",
+            "users",
+            schema,
+            export_options=ExportOptions(preformat=False),
+        )
+        path = tmp_path / "exports" / "markdown" / "cfg" / "inst" / "sch" / "users.md"
+
+        assert "idx_users" in path.read_text(encoding="utf-8")
+
+
 class TestOnlyIfChanged:
     def test_unchanged_schema_returns_unchanged_flag(self, store):
         store.save_table_metadata("cfg", "inst", "sch", "users", SCHEMA_DESC)
@@ -122,33 +228,6 @@ class TestOnlyIfChanged:
         result = store.save_table_metadata("cfg", "inst", "sch", "new_table", SCHEMA_DESC, only_if_changed=True)
         assert "_unchanged" not in result
         assert store.get_table_metadata("cfg", "inst", "sch", "new_table") is not None
-
-
-class TestMarkdownMetadata:
-    def test_saves_llm_friendly_markdown_companion(self, store, tmp_path):
-        ai_doc = {
-            "summary": "Stores application users.",
-            "column_descriptions": {"id": "Primary identifier."},
-        }
-        store.save_table_metadata(
-            "cfg", "inst", "sch", "users", SCHEMA_DESC,
-            ai_documentation=ai_doc,
-            save_markdown=True,
-        )
-
-        markdown = (tmp_path / "cfg" / "inst" / "sch" / "users.md").read_text()
-        assert "# sch.users" in markdown
-        assert "Stores application users." in markdown
-        assert "| id | int |  | Primary identifier. |" in markdown
-
-    def test_creates_markdown_when_unchanged_metadata_is_skipped(self, store, tmp_path):
-        store.save_table_metadata("cfg", "inst", "sch", "users", SCHEMA_DESC)
-        store.save_table_metadata(
-            "cfg", "inst", "sch", "users", SCHEMA_DESC,
-            only_if_changed=True,
-            save_markdown=True,
-        )
-        assert (tmp_path / "cfg" / "inst" / "sch" / "users.md").exists()
 
 
 class TestCustomFieldCarryForward:
@@ -318,3 +397,10 @@ class TestUpdateTableMetadata:
         store.update_table_metadata("host_a", "db1", "users", {"owner": "team-a"})
         updated = store.get_table_metadata("cfg", "host_a", "db1", "users")["updated_at"]
         assert updated != original_ts
+
+    def test_regenerates_default_exports(self, store, tmp_path):
+        store.save_table_metadata("cfg", "host_a", "db1", "users", SCHEMA_DESC)
+        store.update_table_metadata("host_a", "db1", "users", {"owner": "team-a"})
+        path = tmp_path / "exports" / "okf" / "catalog" / "cfg" / "host_a" / "db1" / "users.md"
+
+        assert "owner: team-a" in path.read_text(encoding="utf-8")
