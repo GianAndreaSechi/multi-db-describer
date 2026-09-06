@@ -6,7 +6,7 @@ class SchemaRequest(BaseModel):
     config_name: Optional[str] = Field(
         default=None,
         description=(
-            "Configured database target name, e.g. 'mysql_publishers_dev'. "
+            "Configured database target name, e.g. 'mysql_primary'. "
             "This is not the network host."
         ),
     )

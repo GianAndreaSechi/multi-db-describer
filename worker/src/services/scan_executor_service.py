@@ -7,6 +7,7 @@ from core.db_connector.job_store import JobStore
 from core.db_connector.models import Schema
 from core.db_connector.ai_service import AIDocumentationService
 from core.db_connector.storage import get_metadata_store
+from core.db_connector.exporting import ExportOptions
 
 
 @dataclass
@@ -30,7 +31,7 @@ class ScanExecutorService:
         generate_ai_docs: bool = False,
         save_metadata: bool = True,
         only_if_changed: bool = False,
-        save_markdown: bool = False,
+        export_options: Optional[ExportOptions] = None,
     ) -> ScanExecutionResult:
         """
         Scans tables according to the given scope, stores each TableDescription
@@ -43,19 +44,20 @@ class ScanExecutorService:
             else self.config_service.get_available_configurations()
         )
 
-        # When instance_name is known but config_name is not, skip configs whose
-        # explicitly-configured hosts don't include that instance.  Flat configs
-        # (Athena/DynamoDB/Trino — no "hosts" key) are always kept because their
-        # instances are discovered at runtime.
+        # Keep only configurations that own the requested instance. The API
+        # normally resolves a unique configuration before enqueueing, while this
+        # remains a defensive check for legacy or externally-produced messages.
         if instance_name and not config_name:
-            filtered = []
-            for c in config_names:
-                configured_hosts = self.config_service._get_hosts(c)
-                if not configured_hosts or instance_name in configured_hosts:
-                    filtered.append(c)
-            config_names = filtered
+            config_names = [
+                candidate
+                for candidate in config_names
+                if self.config_service.configuration_matches_instance(
+                    candidate, instance_name, no_cache
+                )
+            ]
 
-        metadata_store = get_metadata_store() if save_metadata else None
+        export_options = export_options or ExportOptions()
+        metadata_store = get_metadata_store() if save_metadata or export_options.formats else None
         ai_service = AIDocumentationService() if generate_ai_docs else None
         logger.info(
             "ScanExecutorService [{}]: AI documentation generation is {}.",
@@ -130,7 +132,8 @@ class ScanExecutorService:
                                         schema_description=desc_dict,
                                         ai_documentation=ai_doc,
                                         only_if_changed=only_if_changed,
-                                        save_markdown=save_markdown,
+                                        export_options=export_options,
+                                        save_metadata=save_metadata,
                                     )
 
                                 result.count += 1

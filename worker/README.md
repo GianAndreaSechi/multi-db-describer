@@ -24,8 +24,8 @@ API  ──xadd──►  Redis Stream (scan:queue)
 ```
 
 1. The API enqueues a job to the Redis Stream (`{prefix}:scan:queue`) and returns a `job_id` (HTTP 202 Accepted).
-2. The Worker reads the job message via `xreadgroup`, calls `mark_running`, and resolves active targets using `resolve_instance_names` (supporting both multi-host and flat connectors like Athena/DynamoDB).
-3. Each scanned `TableDescription` is appended to the Redis results list (`{prefix}:scan:results:{job_id}`). If `generate_ai_docs=true`, results include `ai_documentation`, `ai_generation_status`, and `ai_generation_error`; if `save_metadata=true`, metadata is also persisted to disk/store.
+2. The Worker reads the job message via `xreadgroup`, deserializes `export_formats` and `export_preformat` (defaulting to Markdown+OKF, with legacy `save_markdown` fallback), calls `mark_running`, and defensively matches configurations using `configuration_matches_instance` and `resolve_instance_names`.
+3. Each scanned `TableDescription` is appended to the Redis results list (`{prefix}:scan:results:{job_id}`). If `generate_ai_docs=true`, results include `ai_documentation`, `ai_generation_status`, and `ai_generation_error`. If `save_metadata=true` or exports are active, metadata and derived artifacts (Markdown and OKF catalog bundle) are persisted under `STORAGE_METADATA_DIR` and `STORAGE_EXPORT_DIR`.
 4. On finish, the Worker updates job status via `mark_completed(count)`, `mark_partial(count, error)`, or `mark_failed(error)`.
 5. The API's `GET /scan/{job_id}?include_results=true` reads results directly from Redis.
 
@@ -53,6 +53,8 @@ Copy `.env.example` to `.env`.
 | `LITELLM_API_KEY` | *(none)* | Optional LiteLLM API key override |
 | `LITELLM_API_BASE` | *(none)* | Optional LiteLLM API base URL |
 | `STORAGE_METADATA_DIR` | `storage/metadata` | Directory for JSON metadata files |
+| `STORAGE_EXPORT_DIR` | `storage/exports` | Directory for generated Markdown and OKF exports |
+| `METADATA_STORE_TYPE` | `file` | Metadata store backend (`file`; `s3`/`athena` planned) |
 
 
 DB target variables — see [root README](../README.md#db-configuration--activation).

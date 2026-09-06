@@ -17,4 +17,18 @@ class IntrospectionController:
         if args.command == "instances": return self.service.instances(ScopeRequest(config_name=args.config_name, no_cache=args.no_cache))
         if args.command == "schemas": return self.service.schemas(ScopeRequest(args.config_name, args.instance_name, args.no_cache))
         if args.command == "tables": return self.service.tables(TablesRequest(args.config_name, args.instance_name, args.no_cache, args.schema_name, args.limit, args.offset))
-        return self.service.describe(DescribeRequest(args.config_name, args.instance_name, args.no_cache, args.schema_name, None, None, args.table_name, args.generate_ai_docs, args.save_metadata, args.only_if_changed, args.save_markdown))
+        return self.service.describe(
+            DescribeRequest(
+                config_name=args.config_name,
+                instance_name=args.instance_name,
+                no_cache=args.no_cache,
+                schema_name=args.schema_name,
+                table_name=args.table_name,
+                generate_ai_docs=args.generate_ai_docs,
+                save_metadata=args.save_metadata,
+                only_if_changed=args.only_if_changed,
+                export_markdown=args.export_markdown,
+                export_okf=args.export_okf,
+                preformat=args.preformat,
+            )
+        )

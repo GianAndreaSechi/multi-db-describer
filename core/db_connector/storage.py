@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from loguru import logger
 
+from core.db_connector.exporting import ExportFormat, ExportOptions, FileArtifactStore
+
 
 def build_metadata_key(
     config_name: str, instance_name: str, schema_name: str, table_name: str
@@ -29,14 +31,15 @@ class BaseMetadataStore(ABC):
         schema_description: Dict[str, Any],
         ai_documentation: Optional[Dict[str, Any]] = None,
         only_if_changed: bool = False,
-        save_markdown: bool = False,
+        export_options: Optional[ExportOptions] = None,
+        save_metadata: bool = True,
+        save_markdown: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """Save or update table metadata.
 
         Must preserve existing ai_documentation if ai_documentation is None.
         Must keep schema_description and ai_documentation in separate top-level fields.
-        When ``save_markdown`` is true, implementations should persist an
-        LLM-friendly Markdown representation alongside the metadata.
+        Derived exports are controlled independently through ``export_options``.
         """
         raise NotImplementedError
 
@@ -86,11 +89,17 @@ class BaseMetadataStore(ABC):
 class FileMetadataStore(BaseMetadataStore):
     """File System implementation storing metadata as JSON files."""
 
-    def __init__(self, base_dir: Optional[str] = None):
+    def __init__(self, base_dir: Optional[str] = None, export_dir: Optional[str] = None):
+        explicit_base_dir = base_dir is not None
         if base_dir is None:
             base_dir = os.getenv("STORAGE_METADATA_DIR", "storage/metadata")
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
+        if export_dir is None:
+            export_dir = os.getenv("STORAGE_EXPORT_DIR")
+        if export_dir is None:
+            export_dir = str(self.base_dir / "exports") if explicit_base_dir else "storage/exports"
+        self.artifact_store = FileArtifactStore(export_dir)
 
     @staticmethod
     def _sanitize(name: str) -> str:
@@ -105,62 +114,6 @@ class FileMetadataStore(BaseMetadataStore):
         safe_schema = self._sanitize(schema_name)
         safe_table = self._sanitize(table_name)
         return self.base_dir / safe_config / safe_instance / safe_schema / f"{safe_table}.json"
-
-    def _get_markdown_file_path(
-        self, config_name: str, instance_name: str, schema_name: str, table_name: str
-    ) -> Path:
-        return self._get_file_path(config_name, instance_name, schema_name, table_name).with_suffix(".md")
-
-    @staticmethod
-    def _markdown_escape(value: Any) -> str:
-        return str("" if value is None else value).replace("|", "\\|").replace("\n", " ")
-
-    def _render_markdown(self, record: Dict[str, Any]) -> str:
-        """Render a compact, self-contained schema document for LLM ingestion."""
-        schema = record["schema_description"]
-        lines = [
-            f"# {record['schema_name']}.{record['table_name']}",
-            "",
-            "## Source",
-            "",
-            f"- Configuration: `{record['config_name']}`",
-            f"- Instance: `{record['instance_name']}`",
-            f"- Schema: `{record['schema_name']}`",
-            f"- Table: `{record['table_name']}`",
-            f"- Metadata updated: `{record['updated_at']}`",
-        ]
-        ai_doc = record.get("ai_documentation") or {}
-        if ai_doc.get("summary"):
-            lines.extend(["", "## AI documentation", "", ai_doc["summary"]])
-
-        columns = schema.get("columns", [])
-        if columns:
-            lines.extend(["", "## Columns", "", "| Name | Type | Nullable | Description |", "| --- | --- | --- | --- |"])
-            descriptions = ai_doc.get("column_descriptions", {})
-            for column in columns:
-                lines.append(
-                    "| {name} | {data_type} | {nullable} | {description} |".format(
-                        name=self._markdown_escape(column.get("name")),
-                        data_type=self._markdown_escape(column.get("data_type")),
-                        nullable=self._markdown_escape(column.get("is_nullable")),
-                        description=self._markdown_escape(descriptions.get(column.get("name"))),
-                    )
-                )
-
-        primary_key = schema.get("primary_key") or {}
-        key_columns = primary_key.get("column_names", []) if isinstance(primary_key, dict) else []
-        if key_columns:
-            lines.extend(["", "## Primary key", "", ", ".join(f"`{column}`" for column in key_columns)])
-        if schema.get("foreign_keys"):
-            lines.extend(["", "## Foreign keys", ""])
-            for key in schema["foreign_keys"]:
-                lines.append(f"- `{key.get('column_name')}` → `{key.get('referenced_table')}.{key.get('referenced_column')}`")
-        return "\n".join(lines) + "\n"
-
-    def _save_markdown(self, record: Dict[str, Any]) -> None:
-        path = self._get_markdown_file_path(record["config_name"], record["instance_name"], record["schema_name"], record["table_name"])
-        path.write_text(self._render_markdown(record), encoding="utf-8")
-        logger.info(f"FileMetadataStore: Saved Markdown metadata for {record['table_name']} -> {path}")
 
     def get_table_metadata(
         self,
@@ -194,18 +147,29 @@ class FileMetadataStore(BaseMetadataStore):
         schema_description: Dict[str, Any],
         ai_documentation: Optional[Dict[str, Any]] = None,
         only_if_changed: bool = False,
-        save_markdown: bool = False,
+        export_options: Optional[ExportOptions] = None,
+        save_metadata: bool = True,
+        save_markdown: Optional[bool] = None,
     ) -> Dict[str, Any]:
+        options = export_options or ExportOptions()
+        if export_options is None and save_markdown is not None:
+            formats = list(options.formats)
+            if save_markdown and ExportFormat.MARKDOWN not in formats:
+                formats.append(ExportFormat.MARKDOWN)
+            if not save_markdown:
+                formats = [item for item in formats if item != ExportFormat.MARKDOWN]
+            options = options.model_copy(update={"formats": formats})
+
         file_path = self._get_file_path(config_name, instance_name, schema_name, table_name)
-        file_path.parent.mkdir(parents=True, exist_ok=True)
+        if save_metadata:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
 
         existing_data = self.get_table_metadata(config_name, instance_name, schema_name, table_name) or {}
 
         # Skip write if schema is unchanged (preserves updated_at and avoids noise)
         if only_if_changed and existing_data:
             if existing_data.get("schema_description") == schema_description:
-                if save_markdown:
-                    self._save_markdown(existing_data)
+                self.artifact_store.export(existing_data, options)
                 logger.info(f"FileMetadataStore: No schema change for {table_name}, skipping write.")
                 return {**existing_data, "_unchanged": True}
 
@@ -231,15 +195,15 @@ class FileMetadataStore(BaseMetadataStore):
             "ai_documentation": final_ai_doc,
         }
 
-        try:
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(metadata_record, f, indent=2, ensure_ascii=False)
-            logger.info(f"FileMetadataStore: Saved table metadata for {table_name} -> {file_path}")
-        except Exception as e:
-            logger.error(f"FileMetadataStore: Failed to write {file_path}: {e}")
+        if save_metadata:
+            try:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(metadata_record, f, indent=2, ensure_ascii=False)
+                logger.info(f"FileMetadataStore: Saved table metadata for {table_name} -> {file_path}")
+            except Exception as e:
+                logger.error(f"FileMetadataStore: Failed to write {file_path}: {e}")
 
-        if save_markdown:
-            self._save_markdown(metadata_record)
+        self.artifact_store.export(metadata_record, options)
         return metadata_record
 
 
@@ -347,6 +311,7 @@ class FileMetadataStore(BaseMetadataStore):
             logger.error(f"FileMetadataStore: Failed to write {file_path}: {e}")
             return None
 
+        self.artifact_store.export(existing, ExportOptions())
         return existing
 
 

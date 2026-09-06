@@ -16,15 +16,16 @@ These tools query the live database through the API. Results are TOON-compressed
 | `list_instances` | `config_name?`, `no_cache?` | List database instances. Omit `config_name` to list all active configurations |
 | `list_schemas` | `config_name?`, `instance_name?`, `no_cache?` | List schemas/databases. Omitted fields expand the scope |
 | `list_tables` | `config_name?`, `instance_name?`, `schema_name?`, `limit?`, `offset?`, `no_cache?` | List tables. Omitted scope fields expand the query |
-| `describe_table` | `config_name?`, `instance_name?`, `schema_name?`, `table_name?`, `generate_ai_docs?`, `save_metadata?`, `no_cache?` | Describe tables with optional AI documentation |
+| `describe_table` | `config_name?`, `instance_name?`, `schema_name?`, `table_name?`, `generate_ai_docs?`, `save_metadata?`, `only_if_changed?`, `export_options?`, `no_cache?` | Describe tables with optional AI documentation and derived exports |
 
 > **LLM Optimization**: All introspection tools automatically request data in **TOON** format (`Accept: application/toon`), drastically reducing token consumption compared to verbose JSON.
+> **Export Artifacts**: `describe_table` and `enqueue_scan` generate both **Markdown** and **OKF v0.2** bundle artifacts by default. Pass `export_options: {"formats": []}` or `preformat: false` to customize or opt out.
 
 ### Async Table Scan Tools
 
 | Tool | Parameters | Description |
 |---|---|---|
-| `enqueue_scan` | `config_name?`, `instance_name?`, `schema_name?`, `generate_ai_docs?`, `save_metadata?` | Launch an async background scan job — returns `job_id` |
+| `enqueue_scan` | `config_name?`, `instance_name?`, `schema_name?`, `generate_ai_docs?`, `save_metadata?`, `only_if_changed?`, `export_options?`, `no_cache?` | Launch an async background scan job — returns `job_id` |
 | `get_scan_job` | `job_id`, `include_results?` | Check job status; set `include_results=True` to fetch full `TableDescription` list |
 | `list_scan_jobs` | `limit?` | List recent scan jobs (newest first) |
 
@@ -37,7 +38,7 @@ Typical LLM agent workflow:
 
 These tools read from and write to the **stored metadata snapshots** — JSON documents saved to disk by `/describe` and scan jobs. Unlike the live introspection tools, the data here may be **stale** and may include **human-added annotations** (owner, tags, notes, etc.) that are not present in the live database.
 
-Use these tools to inspect what has been catalogued so far, or to read/update human-enriched metadata.
+Use these tools to inspect what has been indexed and stored so far, or to read/update human-enriched metadata.
 
 | Tool | Parameters | Description |
 |---|---|---|
@@ -69,7 +70,7 @@ Copy `.env.example` to `.env`.
 
 ### Docker Compose
 
-Starting MCP via Docker Compose provisions the **API**, the **MCP Server**, and the **Worker**. Start the shared Redis infrastructure first:
+Starting MCP via Docker Compose provisions the **API**, the **MCP Server**, and the **Worker**, sharing a common `storage` volume for canonical metadata and derived Markdown/OKF exports (`STORAGE_EXPORT_DIR`). Start the shared Redis infrastructure first:
 
 ```bash
 # 1. Start shared Redis infrastructure

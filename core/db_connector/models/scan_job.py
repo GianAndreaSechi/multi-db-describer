@@ -1,7 +1,9 @@
 from enum import Enum
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from core.db_connector.exporting import ExportOptions
 
 
 class ScanStatus(str, Enum):
@@ -20,7 +22,7 @@ class ScanScope(BaseModel):
     generate_ai_docs: bool = False       # If True, generate AI documentation via LiteLLM
     save_metadata: bool = True           # If True, save/update JSON metadata
     only_if_changed: bool = False        # If True, skip unchanged metadata writes
-    save_markdown: bool = False          # If True, save an LLM-friendly Markdown companion file
+    export_options: ExportOptions = Field(default_factory=ExportOptions)
 
 
 

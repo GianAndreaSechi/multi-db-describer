@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from core.db_connector.models import Schema, Table
 from core.db_connector.models.table_details import TableDescription, PrimaryKey
+from core.db_connector.exporting import ExportOptions
 from worker.src.services.scan_executor_service import ScanExecutorService
 
 
@@ -63,6 +64,20 @@ class TestExecuteBasic:
 
         result = executor.execute("job-1", None, None, None)
         assert result.count == 2
+
+    def test_filters_configs_by_explicit_instance(self, executor, config_service):
+        # Replace these generic values only in local integration tests that need real targets.
+        config_service.get_available_configurations.return_value = ["primary", "secondary"]
+        config_service.configuration_matches_instance.side_effect = (
+            lambda config, instance, no_cache: config == "primary"
+        )
+
+        result = executor.execute("job-1", None, "db-primary.example.internal", "mydb")
+
+        assert result.count == 1
+        config_service.resolve_instance_names.assert_called_once_with(
+            "primary", "db-primary.example.internal", False
+        )
 
     def test_multiple_tables_all_counted(self, executor, config_service):
         connector = config_service._get_connector_for_host.return_value
@@ -157,7 +172,24 @@ class TestExecuteMetadata:
 
         mock_store.save_table_metadata.assert_called_once()
 
-    def test_metadata_not_saved_when_disabled(self, executor):
+    def test_store_not_used_when_metadata_and_exports_are_disabled(self, executor):
+        mock_store = MagicMock()
+        with patch(
+            "worker.src.services.scan_executor_service.get_metadata_store",
+            return_value=mock_store,
+        ):
+            executor.execute(
+                "job-1",
+                "cfg1",
+                "host",
+                "mydb",
+                save_metadata=False,
+                export_options=ExportOptions(formats=[]),
+            )
+
+        mock_store.save_table_metadata.assert_not_called()
+
+    def test_exports_run_when_metadata_is_disabled(self, executor):
         mock_store = MagicMock()
         with patch(
             "worker.src.services.scan_executor_service.get_metadata_store",
@@ -165,20 +197,5 @@ class TestExecuteMetadata:
         ):
             executor.execute("job-1", "cfg1", "host", "mydb", save_metadata=False)
 
-        mock_store.save_table_metadata.assert_not_called()
-
-    def test_metadata_passes_only_if_changed_and_markdown_options(self, executor):
-        mock_store = MagicMock()
-        with patch(
-            "worker.src.services.scan_executor_service.get_metadata_store",
-            return_value=mock_store,
-        ):
-            executor.execute(
-                "job-1", "cfg1", "host", "mydb",
-                only_if_changed=True,
-                save_markdown=True,
-            )
-
-        kwargs = mock_store.save_table_metadata.call_args.kwargs
-        assert kwargs["only_if_changed"] is True
-        assert kwargs["save_markdown"] is True
+        mock_store.save_table_metadata.assert_called_once()
+        assert mock_store.save_table_metadata.call_args.kwargs["save_metadata"] is False

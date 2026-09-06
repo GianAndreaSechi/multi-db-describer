@@ -6,6 +6,7 @@ from core.db_connector.config_service import ConfigService
 from core.db_connector.models import Schema, Table, TableDescription
 from core.db_connector.ai_service import AIDocumentationService
 from core.db_connector.storage import get_metadata_store
+from core.db_connector.exporting import ExportOptions
 
 class DescribeTableService:
     def __init__(self, config_service: ConfigService, connector_manager: ConnectorManager):
@@ -22,12 +23,13 @@ class DescribeTableService:
         generate_ai_docs: bool = False,
         save_metadata: bool = True,
         only_if_changed: bool = False,
-        save_markdown: bool = False,
+        export_options: Optional[ExportOptions] = None,
     ) -> List[TableDescription]:
         all_table_descriptions = []
         config_names_to_process = [config_name] if config_name else self.config_service.get_available_configurations()
 
-        metadata_store = get_metadata_store() if save_metadata else None
+        export_options = export_options or ExportOptions()
+        metadata_store = get_metadata_store() if save_metadata or export_options.formats else None
         ai_service = AIDocumentationService() if generate_ai_docs else None
         logger.info(
             "DescribeTableService: AI documentation generation is {}.",
@@ -95,7 +97,8 @@ class DescribeTableService:
                                 schema_description=desc_dict,
                                 ai_documentation=ai_doc,
                                 only_if_changed=only_if_changed,
-                                save_markdown=save_markdown,
+                                export_options=export_options,
+                                save_metadata=save_metadata,
                             )
 
                         logger.info(f"DescribeTableService: Successfully described table: {tbl.name}")

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,186 +7,11 @@
   <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:           #f8fafc;
-      --surface:      #ffffff;
-      --sidebar-bg:   #f1f5f9;
-      --border:       #e2e8f0;
-      --text:         #0f172a;
-      --text-muted:   #64748b;
-      --text-light:   #94a3b8;
-      --accent:       #3b82f6;
-      --accent-dark:  #2563eb;
-      --accent-bg:    #eff6ff;
-      --success:      #16a34a;
-      --success-bg:   #f0fdf4;
-      --success-bdr:  #bbf7d0;
-      --warn:         #d97706;
-      --warn-bg:      #fffbeb;
-      --warn-bdr:     #fde68a;
-      --error:        #dc2626;
-      --error-bg:     #fef2f2;
-      --error-bdr:    #fecaca;
-      --header-bg:    #0f172a;
-      --panel-head:   #e2e8f0;
-      --item-hover:   #e8f0fe;
-      --item-active:  #3b82f6;
-      --item-active-t:#ffffff;
-      --radius:       6px;
-      --font:         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      --mono:         'SF Mono', 'Fira Code', Consolas, 'Courier New', monospace;
-    }
-
-    body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
-    #root { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-
-    /* ── Header ── */
-    .hdr {
-      height: 48px; background: var(--header-bg); color: #fff;
-      display: flex; align-items: center; gap: 12px;
-      padding: 0 20px; flex-shrink: 0;
-    }
-    .hdr-logo { font-size: 18px; }
-    .hdr-title { font-size: 15px; font-weight: 600; letter-spacing: -.2px; }
-    .hdr-divider { width: 1px; height: 18px; background: rgba(255,255,255,.15); margin: 0 4px; }
-    .hdr-bc { display: flex; align-items: center; gap: 5px; font-size: 12px; color: rgba(255,255,255,.5); }
-    .hdr-bc-link { cursor: pointer; padding: 2px 4px; border-radius: 3px; transition: color .1s; }
-    .hdr-bc-link:hover { color: #fff; background: rgba(255,255,255,.1); }
-    .hdr-bc-cur { color: rgba(255,255,255,.85); }
-    .hdr-bc-sep { color: rgba(255,255,255,.25); }
-    .hdr-refresh {
-      margin-left: auto; background: none; border: 1px solid rgba(255,255,255,.2);
-      color: rgba(255,255,255,.6); padding: 4px 10px; border-radius: var(--radius);
-      font-size: 12px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 5px;
-    }
-    .hdr-refresh:hover { background: rgba(255,255,255,.1); color: #fff; }
-    .spin { display: inline-block; animation: spin .7s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ── Layout ── */
-    .layout { flex: 1; display: flex; overflow: hidden; }
-
-    /* ── Sidebar ── */
-    .sidebar {
-      width: 264px; min-width: 264px;
-      background: var(--sidebar-bg); border-right: 1px solid var(--border);
-      display: flex; flex-direction: column; overflow: hidden;
-    }
-
-    /* ── Nav panel ── */
-    .npanel { display: flex; flex-direction: column; flex: 1; min-height: 0; border-bottom: 1px solid var(--border); }
-    .npanel:last-child { border-bottom: none; }
-    .npanel--dim { opacity: .45; pointer-events: none; }
-
-    .npanel-head {
-      display: flex; align-items: center; gap: 6px;
-      padding: 7px 8px 6px 12px; background: var(--panel-head); flex-shrink: 0;
-    }
-    .npanel-icon { font-size: 11px; color: var(--text-muted); }
-    .npanel-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted); flex: 1; }
-    .npanel-count { font-size: 10px; font-weight: 600; color: var(--accent); background: var(--accent-bg); padding: 1px 6px; border-radius: 10px; }
-    .npanel-scan-btn {
-      background: none; border: 1px solid var(--border); color: var(--text-muted);
-      border-radius: 4px; padding: 2px 7px; font-size: 10px; cursor: pointer;
-      display: flex; align-items: center; gap: 3px; transition: all .15s; white-space: nowrap;
-    }
-    .npanel-scan-btn:hover:not(:disabled) { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
-    .npanel-scan-btn:disabled { opacity: .5; cursor: not-allowed; }
-    .npanel-scan-btn--running { border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
-
-    /* ── Search ── */
-    .srch { padding: 6px 8px; flex-shrink: 0; position: relative; }
-    .srch-input { width: 100%; padding: 5px 26px 5px 26px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; background: var(--surface); color: var(--text); outline: none; transition: border-color .15s; }
-    .srch-input:focus { border-color: var(--accent); }
-    .srch-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-light); font-size: 13px; pointer-events: none; }
-    .srch-clear { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-light); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
-    .srch-clear:hover { color: var(--text); }
-
-    /* ── Nav list ── */
-    .nlist { overflow-y: auto; flex: 1; padding: 3px 6px 6px; }
-    .nlist-empty { padding: 10px 6px; font-size: 12px; color: var(--text-light); text-align: center; font-style: italic; }
-    .nlist-err { margin: 4px 0; padding: 6px 8px; font-size: 11px; color: var(--error); background: var(--error-bg); border: 1px solid var(--error-bdr); border-radius: 4px; }
-    .nitem { padding: 6px 10px; border-radius: var(--radius); cursor: pointer; font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none; transition: background .1s, color .1s; }
-    .nitem:hover { background: var(--item-hover); }
-    .nitem--on { background: var(--item-active) !important; color: var(--item-active-t) !important; font-weight: 500; }
-
-    /* ── Scan status bar ── */
-    .scan-bar {
-      flex-shrink: 0; padding: 7px 20px; border-top: 1px solid var(--border);
-      background: var(--warn-bg); display: flex; align-items: center; gap: 10px;
-      font-size: 12px; color: var(--warn);
-    }
-    .scan-bar--done  { background: var(--success-bg); color: var(--success); border-color: var(--success-bdr); }
-    .scan-bar--error { background: var(--error-bg);   color: var(--error);   border-color: var(--error-bdr); }
-    .scan-bar-msg { flex: 1; }
-    .scan-bar-dismiss { background: none; border: none; cursor: pointer; color: inherit; font-size: 16px; line-height: 1; padding: 0 2px; opacity: .7; }
-    .scan-bar-dismiss:hover { opacity: 1; }
-
-    /* ── Main ── */
-    .main { flex: 1; overflow: hidden; display: flex; flex-direction: column; background: var(--surface); position: relative; }
-
-    /* ── Empty state ── */
-    .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
-    .empty-icon { font-size: 38px; opacity: .35; }
-    .empty-text { font-size: 14px; color: var(--text-muted); }
-
-    /* ── Loading overlay ── */
-    .overlay { position: absolute; inset: 0; background: rgba(255,255,255,.75); display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--text-muted); z-index: 10; }
-    .loader { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid var(--border); border-top-color: var(--accent); animation: spin .65s linear infinite; }
-
-    /* ── Detail panel ── */
-    .detail { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-    .detail-hdr { display: flex; align-items: flex-start; justify-content: space-between; padding: 14px 20px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; gap: 12px; }
-    .detail-title { font-size: 15px; font-weight: 600; margin-bottom: 5px; }
-    .detail-badges { display: flex; gap: 6px; flex-wrap: wrap; }
-    .badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
-    .detail-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
-
-    /* ── Buttons ── */
-    .btn { padding: 6px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: background .15s, opacity .15s; white-space: nowrap; }
-    .btn:disabled { opacity: .45; cursor: not-allowed; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover:not(:disabled) { background: var(--accent-dark); }
-    .btn-secondary { background: none; color: var(--text-muted); border: 1px solid var(--border); }
-    .btn-secondary:hover:not(:disabled) { background: var(--bg); color: var(--text); }
-    .btn-ghost { background: none; color: var(--text-muted); border: 1px solid var(--border); }
-    .btn-ghost:hover:not(:disabled) { background: var(--bg); color: var(--text); }
-
-    /* ── Alerts ── */
-    .alert { margin: 8px 20px 0; padding: 8px 12px; border-radius: var(--radius); font-size: 12px; flex-shrink: 0; }
-    .alert-ok   { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-bdr); }
-    .alert-warn { background: var(--warn-bg);    color: var(--warn);    border: 1px solid var(--warn-bdr); }
-    .alert-err  { background: var(--error-bg);   color: var(--error);   border: 1px solid var(--error-bdr); }
-
-    /* ── JSON view ── */
-    .view-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 14px 20px 16px; }
-    .json-pre { flex: 1; overflow: auto; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; font-family: var(--mono); font-size: 12.5px; line-height: 1.75; color: var(--text); white-space: pre; word-break: normal; }
-    .jk { color: #7c3aed; } .js { color: #16a34a; } .jn { color: #dc2626; } .jb { color: #2563eb; } .jz { color: #9ca3af; }
-
-    /* ── Editor ── */
-    .edit-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 12px 20px 0; gap: 8px; }
-    .json-err-msg { font-size: 11px; color: var(--error); background: var(--error-bg); border: 1px solid var(--error-bdr); border-radius: 4px; padding: 5px 10px; flex-shrink: 0; }
-    .json-ta { flex: 1; font-family: var(--mono); font-size: 12.5px; line-height: 1.75; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: var(--radius); resize: none; outline: none; background: var(--surface); color: var(--text); transition: border-color .15s; min-height: 0; }
-    .json-ta:focus { border-color: var(--accent); }
-    .json-ta--inv { border-color: var(--error); }
-    .edit-hint { font-size: 11px; color: var(--text-light); padding: 6px 0 14px; flex-shrink: 0; line-height: 1.6; }
-    .edit-hint code { font-family: var(--mono); background: var(--bg); padding: 1px 4px; border-radius: 3px; font-size: 10px; color: var(--text-muted); border: 1px solid var(--border); }
-
-    /* ── Scan modal ── */
-    .scan-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100; display: flex; align-items: center; justify-content: center; }
-    .scan-modal { background: var(--surface); border-radius: 8px; padding: 22px 24px; width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,.2); }
-    .scan-modal-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
-    .scan-modal-scope { font-size: 12px; color: var(--text-muted); margin-bottom: 18px; }
-    .scan-modal-opt { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 18px; cursor: pointer; transition: background .1s; }
-    .scan-modal-opt:hover { background: var(--bg); }
-    .scan-modal-opt input[type=checkbox] { margin-top: 2px; flex-shrink: 0; width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
-    .scan-modal-opt-label { font-size: 13px; font-weight: 500; }
-    .scan-modal-opt-note { font-size: 11px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
-    .scan-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
-  </style>
+  <script>
+    try { document.documentElement.dataset.theme = localStorage.getItem('irides-theme') || 'dark'; }
+    catch { document.documentElement.dataset.theme = 'dark'; }
+  </script>
+  <link rel="stylesheet" href="/static/irides-basic.css" />
 </head>
 <body>
 <div id="root"></div>
@@ -198,6 +23,11 @@ const API      = '/api/v1';
 const PAGE_SZ  = 200;
 const POLL_MS  = 2500;
 const PROTECTED = new Set(['metadata_key','config_name','instance_name','schema_name','table_name','updated_at']);
+
+function getInitialTheme() {
+  try { return localStorage.getItem('irides-theme') || 'dark'; }
+  catch { return 'dark'; }
+}
 
 // ── API helpers ───────────────────────────────────────────────────────────────
 
@@ -324,15 +154,18 @@ function ScanStatusBar({ scan, onDismiss }) {
 // ── DetailPanel ───────────────────────────────────────────────────────────────
 
 function DetailPanel({ inst, db, tbl, detail, onSaved, onReload }) {
-  const [editing, setEditing]       = useState(false);
-  const [text, setText]             = useState('');
-  const [jsonErr, setJsonErr]       = useState('');
-  const [saveStatus, setSaveStatus] = useState(null);   // null | saving | ok | warn | err
-  const [saveMsg, setSaveMsg]       = useState('');
-  const [refreshing, setRefreshing] = useState(false);
+  const [editing,      setEditing]      = useState(false);
+  const [text,         setText]         = useState('');
+  const [jsonErr,      setJsonErr]      = useState('');
+  const [saveStatus,   setSaveStatus]   = useState(null);   // null | saving | ok | warn | err
+  const [saveMsg,      setSaveMsg]      = useState('');
+  const [refreshing,   setRefreshing]   = useState(false);
+  const [exportMd,     setExportMd]     = useState(true);
+  const [exportOkf,    setExportOkf]    = useState(true);
+  const [preformat,    setPreformat]    = useState(true);
   const taRef = useRef(null);
 
-  useEffect(() => { setEditing(false); setJsonErr(''); setSaveStatus(null); }, [inst, db, tbl]);
+  useEffect(() => { setEditing(false); setJsonErr(''); setSaveStatus(null); setExportMd(true); setExportOkf(true); setPreformat(true); }, [inst, db, tbl]);
 
   function startEdit() {
     setText(JSON.stringify(detail, null, 2)); setJsonErr(''); setSaveStatus(null); setSaveMsg('');
@@ -379,6 +212,10 @@ function DetailPanel({ inst, db, tbl, detail, onSaved, onReload }) {
         save_metadata:   true,
         only_if_changed: true,
         generate_ai_docs: false,
+        export_options: {
+          formats: [exportMd && 'markdown', exportOkf && 'okf'].filter(Boolean),
+          preformat,
+        },
       });
       const updated = await apiFetch(`/metadata/${inst}/${db}/${tbl}`);
       if (updated._unchanged) {
@@ -405,6 +242,18 @@ function DetailPanel({ inst, db, tbl, detail, onSaved, onReload }) {
         <div className="detail-actions">
           {!editing ? (
             <>
+              <label className="chk-inline" title="Generate the Markdown export when refreshing">
+                <input type="checkbox" checked={exportMd} onChange={e => setExportMd(e.target.checked)} />
+                Export Markdown
+              </label>
+              <label className="chk-inline" title="Generate the Open Knowledge Format bundle when refreshing">
+                <input type="checkbox" checked={exportOkf} onChange={e => setExportOkf(e.target.checked)} />
+                Export OKF
+              </label>
+              <label className="chk-inline" title="Keep only essential data in generated artifacts">
+                <input type="checkbox" checked={preformat} onChange={e => setPreformat(e.target.checked)} />
+                Essential
+              </label>
               <button className="btn btn-secondary" onClick={handleRefreshSchema} disabled={refreshing || !detail.config_name}
                 title={detail.config_name ? 'Re-describe the table from the live database and update the schema if it changed' : 'config_name unavailable'}>
                 {refreshing ? <><span className="spin">↻</span> Refreshing…</> : '↺ Refresh schema'}
@@ -451,7 +300,10 @@ function DetailPanel({ inst, db, tbl, detail, onSaved, onReload }) {
 // ── ScanModal ─────────────────────────────────────────────────────────────────
 
 function ScanModal({ pending, onConfirm, onCancel }) {
-  const [genAi, setGenAi] = useState(false);
+  const [genAi,        setGenAi]        = useState(false);
+  const [exportMd,     setExportMd]     = useState(true);
+  const [exportOkf,    setExportOkf]    = useState(true);
+  const [preformat,    setPreformat]    = useState(true);
   const scope = pending.schema_name
     ? `database "${pending.schema_name}" on "${pending.instance_name}"`
     : `instance "${pending.instance_name}"`;
@@ -467,9 +319,30 @@ function ScanModal({ pending, onConfirm, onCancel }) {
             <div className="scan-modal-opt-note">Requires a configured LLM · increases processing time</div>
           </div>
         </label>
+        <label className="scan-modal-opt">
+          <input type="checkbox" checked={exportMd} onChange={e => setExportMd(e.target.checked)} />
+          <div>
+            <div className="scan-modal-opt-label">Export Markdown</div>
+            <div className="scan-modal-opt-note">Enabled by default; clear to skip the Markdown artifact</div>
+          </div>
+        </label>
+        <label className="scan-modal-opt">
+          <input type="checkbox" checked={exportOkf} onChange={e => setExportOkf(e.target.checked)} />
+          <div>
+            <div className="scan-modal-opt-label">Export Open Knowledge Format</div>
+            <div className="scan-modal-opt-note">Generates a conformant OKF v0.2 bundle</div>
+          </div>
+        </label>
+        <label className="scan-modal-opt">
+          <input type="checkbox" checked={preformat} onChange={e => setPreformat(e.target.checked)} />
+          <div>
+            <div className="scan-modal-opt-label">Essential preformatter</div>
+            <div className="scan-modal-opt-note">Keeps the generated artifacts compact and deterministic</div>
+          </div>
+        </label>
         <div className="scan-modal-actions">
           <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
-          <button className="btn btn-primary" onClick={() => onConfirm(genAi)}>Start scan</button>
+          <button className="btn btn-primary" onClick={() => onConfirm(genAi, exportMd, exportOkf, preformat)}>Start scan</button>
         </div>
       </div>
     </div>
@@ -488,6 +361,7 @@ function EmptyState({ inst, db }) {
 // ── App ───────────────────────────────────────────────────────────────────────
 
 function App() {
+  const [theme, setTheme] = useState(getInitialTheme);
   const [instances, setInstances] = useState([]);
   const [databases, setDatabases] = useState([]);
   const [tables,    setTables]    = useState([]);
@@ -508,6 +382,11 @@ function App() {
 
   const setLoad = (k, v) => setLoading(l => ({ ...l, [k]: v }));
   const setErr  = (k, v) => setErrors(e  => ({ ...e, [k]: v }));
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try { localStorage.setItem('irides-theme', theme); } catch {}
+  }, [theme]);
 
   // ── Poll scan job ──────────────────────────────────────────────────────────
 
@@ -532,12 +411,20 @@ function App() {
 
   // ── Scan triggers ──────────────────────────────────────────────────────────
 
-  async function triggerScan(instance_name, schema_name, level, generate_ai_docs = false) {
+  async function triggerScan(instance_name, schema_name, level, generate_ai_docs = false, exportMd = true, exportOkf = true, preformat = true) {
     const setScanning = level === 'inst' ? setScanningInst : setScanningDb;
     setScanning(true);
     setActiveScan({ jobId: null, status: 'pending', level, result_count: null, error: null });
     try {
-      const payload = { instance_name, generate_ai_docs, save_metadata: true };
+      const payload = {
+        instance_name,
+        generate_ai_docs,
+        save_metadata: true,
+        export_options: {
+          formats: [exportMd && 'markdown', exportOkf && 'okf'].filter(Boolean),
+          preformat,
+        },
+      };
       if (schema_name) payload.schema_name = schema_name;
       const data = await apiPost('/scan', payload);
       setActiveScan(s => ({ ...s, jobId: data.job_id, status: data.status }));
@@ -593,14 +480,20 @@ function App() {
   function clearDatabase()  { setSelDb(null); setSelTbl(null); setDetail(null); setTables([]); }
 
   return (
-    <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
+    <div className="app-shell">
       <header className="hdr">
-        <span className="hdr-logo">◈</span>
-        <span className="hdr-title">Irides DB Explorer</span>
+        <span className="hdr-logo">I</span>
+        <span className="hdr-title">Irides<span className="hdr-subtitle">Knowledge explorer</span></span>
         {selInst && <><div className="hdr-divider"/><Breadcrumb inst={selInst} db={selDb} tbl={selTbl} onInst={clearInstance} onDb={clearDatabase}/></>}
-        <button className="hdr-refresh" onClick={loadInstances} title="Reload instances">
-          <span className={loading.inst ? 'spin' : ''}>↺</span> Refresh
-        </button>
+        <div className="hdr-tools">
+          <button className="theme-toggle" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+            {theme === 'dark' ? '☀' : '☾'}
+          </button>
+          <button className="hdr-refresh" onClick={loadInstances} title="Reload instances">
+            <span className={loading.inst ? 'spin' : ''}>↺</span><span>Refresh</span>
+          </button>
+        </div>
       </header>
 
       <div className="layout">
@@ -638,7 +531,7 @@ function App() {
       {pendingScan && (
         <ScanModal
           pending={pendingScan}
-          onConfirm={genAi => { triggerScan(pendingScan.instance_name, pendingScan.schema_name, pendingScan.level, genAi); setPendingScan(null); }}
+          onConfirm={(genAi, exportMd, exportOkf, preformat) => { triggerScan(pendingScan.instance_name, pendingScan.schema_name, pendingScan.level, genAi, exportMd, exportOkf, preformat); setPendingScan(null); }}
           onCancel={() => setPendingScan(null)}
         />
       )}

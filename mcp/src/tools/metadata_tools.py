@@ -61,8 +61,8 @@ def register_tools(mcp):
         Use list_schemas for live discovery.
 
         Args:
-            instance_name: The instance name as it appears in the metadata store
-                           (e.g. 'db.publishers.dev.mxm.local'). Use
+             instance_name: The instance name as it appears in the metadata store
+                            (e.g. 'db-primary.example.internal'). Use
                            list_stored_instances to find valid values.
 
         Returns a paginated list: { items, total, page, page_size, pages }.
@@ -132,9 +132,9 @@ def register_tools(mcp):
         table that the team has curated.
 
         Args:
-            instance_name: Instance name (e.g. 'db.publishers.dev.mxm.local').
-            database_name: Database/schema name (e.g. 'quality_check').
-            table_name:    Table name (e.g. 'quality_check').
+            instance_name: Instance name (e.g. 'db-primary.example.internal').
+            database_name: Database/schema name (e.g. 'example_schema').
+            table_name:    Table name (e.g. 'example_table').
         """
         logger.info(f"MCP: Getting stored metadata for '{instance_name}/{database_name}/{table_name}'")
         result = await api_client.get(

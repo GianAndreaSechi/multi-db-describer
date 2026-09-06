@@ -29,5 +29,6 @@ setup(
         'trino',
         'python-dotenv',
         'litellm',
+        'PyYAML',
     ],
 )

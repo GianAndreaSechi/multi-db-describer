@@ -9,6 +9,7 @@ from core.db_connector.config_service import ConfigService
 from core.db_connector.manager import ConnectorManager
 from core.db_connector.models import Schema, Table
 from core.db_connector.storage import get_metadata_store
+from core.db_connector.exporting import ExportFormat, ExportOptions
 
 from src.dto.requests import DescribeRequest, ScopeRequest, TablesRequest
 
@@ -58,7 +59,13 @@ class IntrospectionService:
 
     def describe(self, request: DescribeRequest) -> List[Any]:
         results = []
-        store = get_metadata_store() if request.save_metadata else None
+        formats = []
+        if request.export_markdown:
+            formats.append(ExportFormat.MARKDOWN)
+        if request.export_okf:
+            formats.append(ExportFormat.OKF)
+        export_options = ExportOptions(formats=formats, preformat=request.preformat)
+        store = get_metadata_store() if request.save_metadata or formats else None
         ai_service = AIDocumentationService() if request.generate_ai_docs else None
         for config, instance, connector in self._scope(request):
             schemas = [Schema(name=request.schema_name)] if request.schema_name else connector.list_schemas(instance_name=instance, no_cache=request.no_cache)
@@ -73,5 +80,15 @@ class IntrospectionService:
                         description = description.model_copy(update={"ai_documentation": ai_documentation, "ai_generation_status": "generated" if ai_documentation else "failed", "ai_generation_error": None if ai_documentation else ai_service.last_error})
                     results.append(description)
                     if store:
-                        store.save_table_metadata(config, instance, schema.name, table.name, schema_description, ai_documentation, only_if_changed=request.only_if_changed, save_markdown=request.save_markdown)
+                        store.save_table_metadata(
+                            config,
+                            instance,
+                            schema.name,
+                            table.name,
+                            schema_description,
+                            ai_documentation,
+                            only_if_changed=request.only_if_changed,
+                            export_options=export_options,
+                            save_metadata=request.save_metadata,
+                        )
         return results

@@ -21,6 +21,7 @@ services:
       REDIS_CACHE_SOCKET_TIMEOUT_SECONDS: 2
       CACHE_KEY_PREFIX: irides
       STORAGE_METADATA_DIR: /app/storage/metadata
+      STORAGE_EXPORT_DIR: /app/storage/exports
       DB_CONFIG_FILE: /app/cli/.env
     networks:
       - irides-net

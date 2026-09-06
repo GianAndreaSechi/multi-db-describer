@@ -35,14 +35,26 @@ irides instances --config sales_mysql
 irides schemas --config sales_mysql --instance db1.company.com
 irides tables --config sales_mysql --instance db1.company.com --schema production --limit 50
 irides describe --config sales_mysql --instance db1.company.com --schema production --table orders
-irides describe --config sales_mysql --instance db1.company.com --schema production --table orders --generate-ai-docs --save-markdown
+irides describe --config sales_mysql --instance db1.company.com --schema production --table orders --generate-ai-docs
+irides describe --config sales_mysql --instance db1.company.com --schema production --table orders --no-export-okf
 ```
 
 Omitting `--config`, `--instance`, `--schema`, or `--table` expands the scope, just like the corresponding API endpoints. Results are always written as JSON to stdout; errors are written to stderr. Add `--no-cache` to introspection commands to bypass Redis.
 
-`describe` saves metadata by default. Available options: `--no-save-metadata`, `--only-if-changed`, `--generate-ai-docs`, and `--save-markdown`.
+`describe` saves canonical JSON metadata and generates both **Markdown** and **Open Knowledge Format (OKF v0.2)** exports by default.
 
-`--save-markdown` writes an LLM-friendly `<table>.md` file next to the JSON metadata. It includes the source scope, schema, columns, keys, and AI documentation when available.
+Available options for `describe`:
+- `--generate-ai-docs`: generate domain summary and column descriptions via LiteLLM.
+- `--no-save-metadata`: skip saving the canonical JSON metadata file (exports are still generated if enabled).
+- `--only-if-changed`: skip writing if the schema is identical to the stored version.
+- `--no-export-markdown`: disable the default Markdown export.
+- `--no-export-okf`: disable the default OKF catalog bundle generation.
+- `--no-preformat`: export full metadata instead of the essential deterministic record.
+- `--save-markdown`: legacy compatibility flag for Markdown export.
+
+Artifacts are persisted under `STORAGE_EXPORT_DIR` (default `storage/exports`):
+- `storage/exports/markdown/{config}/{instance}/{schema}/{table}.md`
+- `storage/exports/okf/catalog/{config}/{instance}/{schema}/{table}.md` (along with `storage/exports/okf/catalog/index.md`)
 
 ## Metadata
 

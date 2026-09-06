@@ -5,7 +5,6 @@ A unified, asynchronous database introspection layer designed to help LLMs and a
 ---
 
 ## Overview
-<b>Version: v0.4.0-alpha</b>
 
 When building AI agents or data tools across multiple databases, a primary challenge is providing accurate, low-overhead schema context. Without proper grounding, LLMs frequently hallucinate column names, infer non-existent relationships, or generate invalid SQL/NoSQL queries.
 
@@ -13,6 +12,7 @@ When building AI agents or data tools across multiple databases, a primary chall
 - Introspects diverse SQL, NoSQL, and cloud analytics databases.
 - Normalizes schemas, tables, columns, indexes, and primary/foreign keys into structured Pydantic models.
 - Provides a versioned REST API (`/api/v1`), MCP endpoints, and asynchronous table scanning via **Redis Streams**.
+- Generates multi-format documentation artifacts, including standalone **Markdown** and **Open Knowledge Format (OKF v0.2)** catalog bundles with deterministic essential views.
 - Optionally generates semantic table documentation via **LiteLLM** and stores it separately from raw schema metadata.
 - Optimizes payload size for LLMs using lightweight serialization ([TOON](https://github.com/toon-format/toon)).
 - Persists introspected metadata (with human annotations) in a **Metadata Store** backed by JSON files, S3, or Athena.
@@ -39,13 +39,13 @@ The system is split into microservices connected via Docker networks and Redis S
                           ┌──────────────┐  ┌──────────────────────┐
                           │ Redis Stream │  │   Metadata Store      │
                           │ (scan:queue) │  │ (JSON / S3 / Athena)  │
-                          └──────┬───────┘  └──────────────────────┘
-                                 │                    ▲
-                                 ▼                    │ write
-                          ┌─────────────┐             │
-                          │   Worker    │─────────────┘
-                          │  (Consumer) │
-                          └──────┬──────┘
+                          └──────┬───────┘  └──────────┬───────────┘
+                                 │                     │ derived
+                                 ▼                     ▼ exports
+                          ┌─────────────┐   ┌──────────────────────┐
+                          │   Worker    │──►│   Artifact Store     │
+                          │  (Consumer) │   │  (Markdown & OKF)    │
+                          └──────┬──────┘   └──────────────────────┘
                                  │
                           ┌──────┴──────┐
                                  │
@@ -60,12 +60,11 @@ The system is split into microservices connected via Docker networks and Redis S
     └──────────────┘   └──────────────────┘   └──────────────┘
 ```
 
-- **`core/`**: Shared Python library providing connector abstractions, models, caching, configuration loaders, and Redis `JobStore`.
-- **`cli/`**: Command-line client built only on `core`, for direct synchronous introspection without running the API service.
+- **`core/`**: Shared Python library providing connector abstractions, models, caching, configuration loaders, multi-format export engines (Markdown & OKF), and Redis `JobStore`.
 - **`infra/`**: Shared Redis container and `irides-net` Docker network.
 - **`api/`**: FastAPI web service exposing the versioned REST API, Metadata API, and Web UI.
-- **`worker/`**: Async task consumer executing background scans and writing results to the Metadata Store.
-- **`mcp/`**: FastMCP server exposing introspection tools directly to AI assistants.
+- **`worker/`**: Async task consumer executing background scans, writing metadata and generating derived export artifacts.
+- **`mcp/`**: FastMCP server exposing introspection and scan tools directly to AI assistants.
 
 ---
 
@@ -82,12 +81,35 @@ All API endpoints are served under the `/api/v1` prefix.
 | `POST` | `/api/v1/instances` | `config_name?` | List instances; omit `config_name` to list all |
 | `POST` | `/api/v1/schemas` | `config_name?`, `instance_name?` | List databases/schemas |
 | `POST` | `/api/v1/tables` | `config_name?`, `instance_name?`, `schema_name?`, `limit?`, `offset?` | List tables |
-| `POST` | `/api/v1/describe` | `config_name?`, `instance_name?`, `schema_name?`, `table_name?`, `generate_ai_docs?`, `save_metadata?`, `only_if_changed?`, `save_markdown?` | Describe table structure |
-| `POST` | `/api/v1/scan` | `config_name?`, `instance_name?`, `schema_name?`, `generate_ai_docs?`, `save_metadata?`, `only_if_changed?`, `save_markdown?` | Enqueue async scan job — returns `job_id` (HTTP 202) |
+| `POST` | `/api/v1/describe` | `config_name?`, `instance_name?`, `schema_name?`, `table_name?`, `generate_ai_docs?`, `save_metadata?`, `only_if_changed?`, `export_options?` | Describe table structure and optional AI documentation |
+| `POST` | `/api/v1/scan` | `config_name?`, `instance_name?`, `schema_name?`, `generate_ai_docs?`, `save_metadata?`, `only_if_changed?`, `export_options?` | Enqueue async scan job — returns `job_id` (HTTP 202) |
 | `GET` | `/api/v1/scan/{job_id}` | `include_results?` | Get scan job status and optional results |
 | `GET` | `/api/v1/scans` | `limit?` | List recent scan jobs (newest first) |
 
 Scope fields are all optional — omitting any field expands the operation to all available values at that level. Send header `no-cache: true` to bypass the Redis introspection cache.
+
+### Multi-Format Artifact Exports (Markdown & OKF)
+
+Both `/describe` and `/scan` generate derived documentation artifacts by default alongside canonical JSON metadata:
+- **Markdown**: Clean, human- and LLM-readable Markdown documentation rendering schema columns, descriptions, primary keys, foreign keys, unique indexes, and partition layouts.
+- **Open Knowledge Format (OKF v0.2)**: Structured concept documents with YAML frontmatter (`type: Database Table`, title, description, tags, generator metadata, identifiers) and Markdown body, with an automatically maintained `index.md` catalog bundle index.
+- **Deterministic Preformatting (`essential_record`)**: Enabled by default (`preformat: true`), compacting tables to essential structural and semantic elements while omitting secondary non-unique indexes and internal metadata to minimize LLM context overhead.
+- **Decoupled Persistence**: Exports run independently of canonical metadata storage — setting `save_metadata: false` allows generating Markdown or OKF artifacts without saving JSON files.
+
+Files are organized under `STORAGE_METADATA_DIR` and `STORAGE_EXPORT_DIR`:
+
+```text
+storage/
+  metadata/
+    {config}/{instance}/{schema}/{table}.json
+  exports/
+    markdown/
+      {config}/{instance}/{schema}/{table}.md
+    okf/
+      catalog/
+        index.md
+        {config}/{instance}/{schema}/{table}.md
+```
 
 ---
 
@@ -144,8 +166,6 @@ Example request body:
 
 Pass `only_if_changed=true` on a describe or scan request to skip writing to the Metadata Store when the freshly introspected schema is identical to the stored one. This avoids resetting `updated_at` and is the default mode used by the Web UI's single-table refresh action.
 
-Pass `save_markdown=true` on a describe or scan request to save an LLM-friendly Markdown companion file (`<table>.md`) next to each JSON metadata document. It contains source scope, columns, keys, and AI documentation when generated.
-
 ---
 
 ## Web UI (`/ui`)
@@ -158,8 +178,10 @@ A browser-based interface is available at `GET /ui`. It connects to the same Fas
 - **Search and filter**: Full-text search across table names, owners, tags, and notes.
 - **Inspect**: View the full metadata JSON for any table with syntax highlighting.
 - **Annotate**: Edit and save custom fields (owner, tags, notes, etc.) directly from the browser via the PATCH Metadata API.
+- **Theme toggle**: Seamless switch between Dark and Light mode with theme preferences persisted in `localStorage`.
+- **Export controls**: Opt-out checkboxes for Markdown export, OKF bundle export, and Essential preformatting directly in table refresh and scan modals.
 - **Scan**: Trigger an asynchronous scan at the instance or database level using the async scan API; a progress indicator shows job status.
-- **Refresh**: Re-introspect a single table's schema from the live database (`only_if_changed=true` is applied so unchanged schemas do not overwrite existing annotations).
+- **Refresh**: Re-introspect a single table's schema from the live database (`only_if_changed=true` is applied so unchanged schemas do not overwrite existing annotations) and automatically regenerate derived exports.
 
 ---
 
@@ -322,7 +344,7 @@ DB_TARGET_<KEY>_DATABASE=:memory:           # optional, default :memory:
 
 Empty optional variables are treated as unset, so connector defaults still apply where defined. `DB_CONFIG_FILE` can point to an explicit `.env` file for Docker containers, e.g. `/app/api/.env`.
 
-### Optional AI Documentation
+### Optional AI Documentation & Storage Settings
 
 Set `generate_ai_docs=true` on `/describe` or `/scan` requests to generate `ai_documentation` via LiteLLM. Results include:
 - `ai_documentation`: generated summary and column descriptions, or `null` if generation fails.
@@ -336,7 +358,9 @@ Relevant environment variables:
 | `LITELLM_MODEL` | `gpt-4o-mini` | LiteLLM model name |
 | `LITELLM_API_KEY` | *(none)* | Optional provider API key override |
 | `LITELLM_API_BASE` | *(none)* | Optional custom LiteLLM API base URL |
-| `STORAGE_METADATA_DIR` | `storage/metadata` | File metadata output directory |
+| `STORAGE_METADATA_DIR` | `storage/metadata` | File metadata JSON output directory |
+| `STORAGE_EXPORT_DIR` | `storage/exports` | Directory for generated Markdown and OKF exports |
+| `METADATA_STORE_TYPE` | `file` | Metadata store backend (`file`; `s3`/`athena` planned) |
 
 ---
 
@@ -400,13 +424,12 @@ for col in table_desc.columns:
   - [x] Redis Stream async scanner & dead worker consumer recovery
   - [x] TOON format output for LLM context reduction
   - [x] MCP Server integration for Claude / Gemini / Cursor
+  - [x] Multi-format artifact export (Markdown & Open Knowledge Format - OKF v0.2) with essential preformatting
   - [x] Unified host and flat instance resolution
   - [x] Automatic semantic documentation & LLM-generated table descriptions (via LiteLLM)
   - [x] Abstract metadata storage (`FileMetadataStore` JSON persistence & DB provider interface)
   - [x] Versioned REST API (`/api/v1`)
   - [x] Metadata Store read/write API with pagination and human annotations
-  - [x] Web UI for metadata browsing and editing (`/ui`)
+  - [x] Web UI for metadata browsing and editing (`/ui`) with dark/light themes
   - [x] `only_if_changed` flag on describe/scan to avoid overwriting unchanged schemas
   - [x] Custom field preservation across re-describes
-  - [x] Create cli
-  - [ ] Refactoring code and moving hardcoded values to constants/config files.

@@ -3,6 +3,7 @@ import fakeredis
 from unittest.mock import patch
 from core.db_connector.job_store import JobStore
 from core.db_connector.models.scan_job import ScanScope, ScanStatus
+from core.db_connector.exporting import ExportFormat, ExportOptions
 
 
 @pytest.fixture
@@ -21,6 +22,7 @@ SCOPE_FULL = ScanScope(
     no_cache=True,
     generate_ai_docs=True,
     save_metadata=False,
+    export_options=ExportOptions(formats=[ExportFormat.OKF], preformat=False),
 )
 
 
@@ -44,6 +46,21 @@ class TestEnqueue:
         assert fetched.scope.no_cache is True
         assert fetched.scope.generate_ai_docs is True
         assert fetched.scope.save_metadata is False
+        assert fetched.scope.export_options.formats == [ExportFormat.OKF]
+        assert fetched.scope.export_options.preformat is False
+
+    def test_default_exports_preserved(self, job_store):
+        job = job_store.enqueue(SCOPE)
+        fetched = job_store.get_job(job.job_id)
+        assert fetched.scope.export_options.formats == [ExportFormat.MARKDOWN, ExportFormat.OKF]
+        assert fetched.scope.export_options.preformat is True
+
+    def test_stream_contains_export_options(self, job_store):
+        job_store.enqueue(SCOPE_FULL)
+        messages = job_store.r.xrange(job_store._stream_key())
+        fields = messages[-1][1]
+        assert fields["export_formats"] == '["okf"]'
+        assert fields["export_preformat"] == "false"
 
     def test_job_appears_in_list(self, job_store):
         job = job_store.enqueue(SCOPE)

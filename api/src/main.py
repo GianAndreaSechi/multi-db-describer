@@ -1,5 +1,6 @@
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Header, Depends
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 from pydantic import BaseModel
@@ -8,7 +9,8 @@ from datetime import datetime, timezone
 import asyncio
 import os
 
-_UI_FILE = Path(__file__).parent / "static" / "index.html"
+_STATIC_DIR = Path(__file__).parent / "static"
+_UI_FILE = _STATIC_DIR / "index.html"
 
 from core.db_connector.manager import ConnectorManager
 from core.db_connector.models import (
@@ -38,6 +40,7 @@ app = FastAPI(
     description="API for connecting to various databases and performing introspection.",
     version="0.2.0",
 )
+app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
 # Initialize CacheManager
 cache_manager = CacheManager(
@@ -64,7 +67,7 @@ job_store = JobStore(
     prefix=os.getenv("CACHE_KEY_PREFIX", "multi-db-connector"),
     socket_connect_timeout=float(os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS", 2)),
 )
-scan_service = ScanService(job_store)
+scan_service = ScanService(job_store, config_service)
 
 # Helper to extract no_cache header
 def get_no_cache_header(no_cache: Optional[str] = Header(None)) -> bool:
@@ -199,7 +202,7 @@ async def describe_table_route(req: DescribeTableRequest, http_request: Request,
         f"schema: {req.schema_name if req.schema_name else 'all'}, "
         f"table: {req.table_name if req.table_name else 'all'}, "
         f"generate_ai_docs={req.generate_ai_docs}, save_metadata={req.save_metadata}, "
-        f"only_if_changed={req.only_if_changed}, save_markdown={req.save_markdown}"
+        f"only_if_changed={req.only_if_changed}, export_options={req.export_options.model_dump(mode='json')}"
     )
     try:
         data = await asyncio.to_thread(
@@ -212,7 +215,7 @@ async def describe_table_route(req: DescribeTableRequest, http_request: Request,
             generate_ai_docs=req.generate_ai_docs,
             save_metadata=req.save_metadata,
             only_if_changed=req.only_if_changed,
-            save_markdown=req.save_markdown,
+            export_options=req.export_options,
         )
         return api_response(http_request, "Table description retrieved successfully.", data)
     except ValueError as e:
@@ -246,7 +249,7 @@ async def enqueue_scan(req: ScanRequest, http_request: Request, no_cache: bool =
         f"API: Enqueuing scan job config={req.config_name}, "
         f"instance={req.instance_name}, schema={req.schema_name}, no_cache={no_cache}, "
         f"generate_ai_docs={req.generate_ai_docs}, save_metadata={req.save_metadata}, "
-        f"only_if_changed={req.only_if_changed}, save_markdown={req.save_markdown}"
+        f"only_if_changed={req.only_if_changed}, export_options={req.export_options.model_dump(mode='json')}"
     )
     try:
         job = scan_service.enqueue_scan(
@@ -257,13 +260,16 @@ async def enqueue_scan(req: ScanRequest, http_request: Request, no_cache: bool =
             generate_ai_docs=req.generate_ai_docs,
             save_metadata=req.save_metadata,
             only_if_changed=req.only_if_changed,
-            save_markdown=req.save_markdown,
+            export_options=req.export_options,
         )
         return api_response(http_request, "Scan job enqueued successfully.", job.model_dump(mode="json"))
 
     except ConnectionError as e:
         logger.error(f"API: Scan enqueue failed — Redis unreachable: {e}")
         raise HTTPException(status_code=503, detail=f"Queue unavailable: {e}")
+    except ValueError as e:
+        logger.error(f"API: Scan enqueue rejected: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("API: Unexpected error while enqueuing scan job")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
